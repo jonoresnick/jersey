@@ -14,7 +14,7 @@
   const UI_KEY = 'hockey-uniform-builder:ui';
 
   let state, history = [], future = [];
-  const ui = { tab: 'template', view: 'full' };
+  const ui = { tab: 'template', view: 'player' };
 
   /* ---------------- design model ---------------- */
   function deepMerge(base, over) {
@@ -140,18 +140,26 @@
   }
 
   function doRender() {
-    const k = kit(), R = UB.render;
-    const full = ui.view === 'full';
-    $('#stage').innerHTML =
-      `<div class="board${full ? ' is-full' : ''}">` +
-      `<figure class="part part-jersey">${R.jersey(state, k, 'front', { attrs: 'role="img" aria-label="Jersey front"' })}<figcaption>Front</figcaption></figure>` +
-      `<figure class="part part-jersey">${R.jersey(state, k, 'back', { attrs: 'role="img" aria-label="Jersey back"' })}<figcaption>Back</figcaption></figure>` +
-      (full
-        ? `<figure class="part part-helmet">${R.helmet(state, k, { attrs: 'role="img" aria-label="Helmet"' })}<figcaption>Helmet</figcaption></figure>` +
-          `<figure class="part part-pants">${R.pants(state, k, { attrs: 'role="img" aria-label="Pants"' })}<figcaption>Pants</figcaption></figure>` +
-          `<figure class="part part-socks">${R.socks(state, k, { attrs: 'role="img" aria-label="Socks"' })}<figcaption>Socks</figcaption></figure>`
-        : '') +
-      `</div>`;
+    const k = kit(), R = UB.render, X = UB.real;
+    const fig = (cls, svg, cap) => `<figure class="part ${cls}">${svg}<figcaption>${cap}</figcaption></figure>`;
+    let html;
+    if (ui.view === 'player') {
+      html = `<div class="board board-real">` +
+        fig('part-player', X.player(state, k, 'front', { attrs: 'role="img" aria-label="Player, front"' }), 'Front') +
+        fig('part-player', X.player(state, k, 'back', { attrs: 'role="img" aria-label="Player, back"' }), 'Back') + `</div>`;
+    } else if (ui.view === 'jersey') {
+      html = `<div class="board board-real">` +
+        fig('part-real-jersey', X.jersey(state, k, 'front', { attrs: 'role="img" aria-label="Jersey front"' }), 'Front') +
+        fig('part-real-jersey', X.jersey(state, k, 'back', { attrs: 'role="img" aria-label="Jersey back"' }), 'Back') + `</div>`;
+    } else {
+      html = `<div class="board is-full">` +
+        fig('part-jersey', R.jersey(state, k, 'front', { attrs: 'role="img" aria-label="Jersey front"' }), 'Front') +
+        fig('part-jersey', R.jersey(state, k, 'back', { attrs: 'role="img" aria-label="Jersey back"' }), 'Back') +
+        fig('part-helmet', R.helmet(state, k, { attrs: 'role="img" aria-label="Helmet"' }), 'Helmet') +
+        fig('part-pants', R.pants(state, k, { attrs: 'role="img" aria-label="Pants"' }), 'Pants') +
+        fig('part-socks', R.socks(state, k, { attrs: 'role="img" aria-label="Socks"' }), 'Socks') + `</div>`;
+    }
+    $('#stage').innerHTML = html;
     $('#stage-kit').textContent = `${UB.KIT_NAMES[state.active]} · ${k.swap ? 'Light' : 'Dark'} sweater`;
     renderContrast();
     renderKitTabs();
@@ -214,6 +222,7 @@
       case 'sockStripe1': return allBands[2] !== 'none';
       case 'sockStripe2': return usesC2([allBands[2]]);
       case 'helmetDecal': return L.helmetNumber;
+      case 'stick': return L.stick !== false;
       default: return true;
     }
   }
@@ -459,8 +468,10 @@
     try {
       const css = await embeddedFontCSS();
       await document.fonts.ready;
-      const svg = all ? UB.render.lineup(state, css) : UB.render.sheet(state, state.active, css);
-      const [w, h] = all ? [1500, 1060] : [1400, 1180];
+      const flat = ui.view === 'flat';
+      const lib = flat ? UB.render : UB.real;
+      const svg = all ? lib.lineup(state, css) : lib.sheet(state, state.active, css);
+      const [w, h] = flat ? (all ? [1500, 1060] : [1400, 1180]) : (all ? [1840, 1380] : [1840, 1330]);
       const blob = await svgToPng(svg, w, h);
       const url = URL.createObjectURL(blob);
       const name = `${slug()}-${all ? 'uniform-set' : state.active}.png`;
@@ -477,7 +488,7 @@
 
   async function exportSvg() {
     const css = await embeddedFontCSS();
-    const svg = UB.render.sheet(state, state.active, css);
+    const svg = (ui.view === 'flat' ? UB.render : UB.real).sheet(state, state.active, css);
     download(new Blob([svg], { type: 'image/svg+xml' }), `${slug()}-${state.active}.svg`);
     toast('SVG exported');
   }
@@ -765,10 +776,34 @@
     }),
   };
 
+  /* A small fabric-weave texture (mid-grey = no change under hard-light). */
+  function makeNoise() {
+    try {
+      const n = 160, c = document.createElement('canvas');
+      c.width = c.height = n;
+      const ctx = c.getContext('2d'), img = ctx.createImageData(n, n);
+      let seed = 1;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          const weave = ((x + y) % 4 < 2 ? 6 : -6) + (y % 3 === 0 ? -5 : 0) + (x % 3 === 0 ? 4 : 0);
+          const v = 128 + weave + (rnd() - 0.5) * 34;
+          const i = (y * n + x) * 4;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return c.toDataURL('image/png');
+    } catch (e) { return null; }
+  }
+
   /* ---------------- boot ---------------- */
   function boot() {
     try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || '{}')); } catch (e) { /* defaults */ }
     if (!$(`.tabpanel[data-panel="${ui.tab}"]`)) ui.tab = 'template';
+    if (!UB.VIEWS[ui.view]) ui.view = 'player';
+    UB.NOISE = makeNoise();
     state = load();
     buildSelects();
     buildSegs();

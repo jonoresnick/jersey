@@ -38,6 +38,7 @@ UB.ZONE_GROUPS = [
   { id: 'pants',    label: 'Pants' },
   { id: 'socks',    label: 'Socks' },
   { id: 'helmet',   label: 'Helmet' },
+  { id: 'gear',     label: 'Gloves, skates & stick' },
 ];
 UB.ZONES = [
   { id: 'body',          label: 'Body',            group: 'jersey' },
@@ -48,6 +49,7 @@ UB.ZONES = [
   { id: 'stripe2',       label: 'Accent stripe',   group: 'jersey' },
   { id: 'pattern',       label: 'Pattern',         group: 'jersey' },
   { id: 'collar',        label: 'Collar',          group: 'jersey' },
+  { id: 'collarTrim',    label: 'Collar piping',   group: 'jersey' },
   { id: 'cuffs',         label: 'Cuffs',           group: 'jersey' },
   { id: 'laces',         label: 'Laces',           group: 'jersey' },
   { id: 'number',        label: 'Number',          group: 'lettering' },
@@ -66,24 +68,30 @@ UB.ZONES = [
   { id: 'helmet',        label: 'Helmet shell',    group: 'helmet' },
   { id: 'helmetTrim',    label: 'Ear guard & strap', group: 'helmet' },
   { id: 'helmetDecal',   label: 'Helmet number',   group: 'helmet' },
+  { id: 'gloves',        label: 'Gloves',          group: 'gear' },
+  { id: 'glovesTrim',    label: 'Glove cuffs & rolls', group: 'gear' },
+  { id: 'skates',        label: 'Skate boots',     group: 'gear' },
+  { id: 'skatesTrim',    label: 'Skate accents',   group: 'gear' },
+  { id: 'stick',         label: 'Stick',           group: 'gear' },
 ];
 
 /* Default colour for each zone. Templates override the jersey and sock zones. */
 UB.BASE_COLORS = {
   body: 'p0', sleeves: 'p0', yoke: 'p1', yokeTrim: 'p2', stripe1: 'p1', stripe2: 'p2',
-  pattern: 'p2', collar: 'p1', cuffs: 'p0', laces: 'p1',
+  pattern: 'p2', collar: 'p1', collarTrim: 'p2', cuffs: 'p0', laces: 'p1',
   number: 'p1', numberOutline: 'p2', numberOutline2: 'p1', name: 'p1',
   crestBg: 'p1', crestRing: 'p2', crestText: 'p0',
   pants: 'p0', pantsStripe1: 'p1', pantsStripe2: 'p2',
   socks: 'p0', sockStripe1: 'p1', sockStripe2: 'p2',
-  helmet: 'p0', helmetTrim: 'p2', helmetDecal: 'p1',
+  helmet: 'p0', helmetTrim: 'p0', helmetDecal: 'p1',
+  gloves: 'p0', glovesTrim: 'p1', skates: '#17191C', skatesTrim: 'p0', stick: '#16181A',
 };
 /* Zones a template sets when you apply it (everything else keeps your choice). */
 UB.TEMPLATE_ZONES = ['body', 'sleeves', 'yoke', 'yokeTrim', 'stripe1', 'stripe2', 'pattern',
-  'collar', 'cuffs', 'laces', 'socks', 'sockStripe1', 'sockStripe2'];
+  'collar', 'collarTrim', 'cuffs', 'laces', 'socks', 'sockStripe1', 'sockStripe2'];
 /* Zones that swap Primary ↔ Secondary when a kit is set to a light (away) sweater. */
 UB.SWAP_ZONES = new Set(['body', 'sleeves', 'yoke', 'yokeTrim', 'stripe1', 'stripe2', 'pattern',
-  'collar', 'cuffs', 'laces', 'number', 'numberOutline', 'numberOutline2', 'name',
+  'collar', 'collarTrim', 'cuffs', 'laces', 'number', 'numberOutline', 'numberOutline2', 'name',
   'socks', 'sockStripe1', 'sockStripe2']);
 
 /* Stripe sets, used for hem stripes, sleeve stripes and socks.
@@ -128,7 +136,7 @@ UB.PATCHES = { none: 'None', mini: 'Mini crest', image: 'Your logo' };
 UB.PANTS_STRIPES = { none: 'None', single: 'Single', outlined: 'Outlined', twin: 'Twin', hem: 'Leg bands' };
 UB.SOCK_STYLES = Object.assign({ match: 'Match jersey hem' },
   Object.fromEntries(Object.entries(UB.STRIPE_SETS).map(([k, v]) => [k, v.label])));
-UB.VIEWS = { full: 'Full uniform', jersey: 'Jersey only' };
+UB.VIEWS = { player: 'Player', jersey: 'Jersey', flat: 'Flat sheet' };
 
 /* Starting values for a jersey. Templates only list what they change. */
 UB.DEFAULT_JERSEY = {
@@ -232,7 +240,7 @@ UB.TEMPLATES = [
 UB.SAMPLE = {
   team: { name: 'Harbour Storm', palette: UB.SCHEMES[0].colors.slice() },
   player: { name: 'Lindqvist', number: '27', captain: 'C' },
-  lettering: { numberFont: 'graduate', nameFont: 'graduate', outlines: 2, nameArch: true, sleeveNumbers: true, helmetNumber: true },
+  lettering: { numberFont: 'graduate', nameFont: 'graduate', outlines: 2, nameArch: true, sleeveNumbers: true, helmetNumber: true, pantsCrest: true, stick: true },
   crest: { style: 'roundel', initials: 'HS', wordmark: 'Storm', image: null, scale: 1, patch: 'mini', patchImage: null },
   kits: {
     home:  { template: 'original', swap: false },

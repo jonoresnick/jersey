@@ -233,9 +233,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .part svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .part figcaption { font: 600 11px/1 var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-2); }
 .part-jersey { grid-column: span 3; }
+.board-real { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 1000px; }
+.board-real .part { grid-column: span 1; }
 .part-helmet, .part-pants, .part-socks { grid-column: span 2; }
 .stage [data-zone] { cursor: pointer; }
-.stage [data-zone]:hover { filter: brightness(1.12) saturate(1.05); }
 
 .contrast {
   display: inline-flex;
