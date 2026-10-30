@@ -396,5 +396,5 @@
 
   UB.render = { jersey, pants, socks, helmet, sheet, lineup, crest };
   /* Shared helpers for the realistic renderer. */
-  UB.render._ = { uid, R, esc, P, outlinedText, crest, font, stripeSet, yokePath, numberCols };
+  UB.render._ = { uid, R, esc, P, outlinedText, crest, font, stripeSet, yokePath, numberCols, shieldPath };
 })();

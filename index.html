@@ -59,7 +59,8 @@
       <div class="stage-bar">
         <div class="stage-title"><span class="eyebrow">Editing</span><strong id="stage-kit">Home</strong></div>
         <div class="seg seg-sm" id="view-seg" role="group" aria-label="Preview">
-          <button type="button" data-view="player" aria-pressed="true">Player</button>
+          <button type="button" data-view="photo" aria-pressed="true">Photo</button>
+          <button type="button" data-view="player" aria-pressed="false">Player</button>
           <button type="button" data-view="jersey" aria-pressed="false">Jersey</button>
           <button type="button" data-view="flat" aria-pressed="false">Flat sheet</button>
         </div>
@@ -226,8 +227,20 @@
               </div>
             </div>
           </div>
+                  <div class="group">
+            <h3>Logos on the photo</h3>
+            <p class="help">Extra logos for the Photo view, such as a league patch, sponsor or the brand marks on the pants. PNGs with transparent backgrounds look best.</p>
+            <div class="logo-slots" id="photo-logos">
+              <div class="logo-slot"><span>Left chest</span><small data-logo-state="chestL"></small><button type="button" class="btn btn-sm" data-logo-up="chestL">Upload</button><button type="button" class="link-btn" data-logo-rm="chestL">Remove</button></div>
+              <div class="logo-slot"><span>Right chest</span><small data-logo-state="chestR"></small><button type="button" class="btn btn-sm" data-logo-up="chestR">Upload</button><button type="button" class="link-btn" data-logo-rm="chestR">Remove</button></div>
+              <div class="logo-slot"><span>Collar</span><small data-logo-state="neck"></small><button type="button" class="btn btn-sm" data-logo-up="neck">Upload</button><button type="button" class="link-btn" data-logo-rm="neck">Remove</button></div>
+              <div class="logo-slot"><span>Pants, left leg</span><small data-logo-state="pantsL"></small><button type="button" class="btn btn-sm" data-logo-up="pantsL">Upload</button><button type="button" class="link-btn" data-logo-rm="pantsL">Remove</button></div>
+              <div class="logo-slot"><span>Pants, right leg</span><small data-logo-state="pantsR"></small><button type="button" class="btn btn-sm" data-logo-up="pantsR">Upload</button><button type="button" class="link-btn" data-logo-rm="pantsR">Remove</button></div>
+            </div>
+          </div>
         </section>
 
+        <!-- (photo logos live in the Crest tab) -->
         <!-- PANTS & SOCKS -->
         <section class="tabpanel" data-panel="kit" role="tabpanel" hidden>
           <div class="group">
@@ -265,12 +278,15 @@
 <input type="file" id="design-file" accept=".json,application/json" hidden>
 <input type="file" id="crest-file" accept="image/*" hidden>
 <input type="file" id="patch-file" accept="image/*" hidden>
+<input type="file" id="photo-logo-file" accept="image/*" hidden>
 
 <script src="js/data.js"></script>
 <script src="js/color.js"></script>
 <script src="js/patterns.js"></script>
 <script src="js/render.js"></script>
 <script src="js/realistic.js"></script>
+<script src="js/photo-assets.js"></script>
+<script src="js/photo.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

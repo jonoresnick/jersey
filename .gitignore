@@ -1,3 +1,6 @@
 dist/
 node_modules/
 .DS_Store
+scripts/photo-template/out/
+scripts/photo-template/fg.png
+scripts/photo-template/vis_*.png

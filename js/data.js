@@ -15,6 +15,7 @@ UB.PALETTE_SLOTS = ['Primary', 'Secondary', 'Accent', 'Trim', 'Extra'];
 
 /* Ready-made team palettes (5 colours each, in slot order). */
 UB.SCHEMES = [
+  { name: 'Bulldog Gold',   colors: ['#111111', '#FFFFFF', '#FFC62E', '#141414', '#7A4A2A'] },
   { name: 'Harbour Navy',   colors: ['#0B2545', '#FFFFFF', '#C8102E', '#8D99AE', '#4F9DDE'] },
   { name: 'Crimson & White', colors: ['#B5121B', '#FFFFFF', '#111111', '#9EA2A2', '#7A0019'] },
   { name: 'Black & Gold',   colors: ['#111111', '#FFB81C', '#FFFFFF', '#5C6670', '#A07A2C'] },
@@ -84,7 +85,7 @@ UB.BASE_COLORS = {
   pants: 'p0', pantsStripe1: 'p1', pantsStripe2: 'p2',
   socks: 'p0', sockStripe1: 'p1', sockStripe2: 'p2',
   helmet: 'p0', helmetTrim: 'p0', helmetDecal: 'p1',
-  gloves: 'p0', glovesTrim: 'p1', skates: '#17191C', skatesTrim: 'p0', stick: '#16181A',
+  gloves: 'p0', glovesTrim: 'p2', skates: '#17191C', skatesTrim: 'p0', stick: '#16181A',
 };
 /* Zones a template sets when you apply it (everything else keeps your choice). */
 UB.TEMPLATE_ZONES = ['body', 'sleeves', 'yoke', 'yokeTrim', 'stripe1', 'stripe2', 'pattern',
@@ -107,6 +108,7 @@ UB.STRIPE_SETS = {
   outlined: { label: 'Outlined', bands: [{ at: 0, h: 34, c: 2 }, { at: 5, h: 24, c: 1 }] },
   tricolor: { label: 'Tri-colour', bands: [{ at: 0, h: 12, c: 1 }, { at: 12, h: 12, c: 2 }, { at: 24, h: 12, c: 1 }] },
   wide:     { label: 'Wide band', bands: [{ at: 0, h: 46, c: 1 }] },
+  pair:     { label: 'Two bands', bands: [{ at: 0, h: 21, c: 2 }, { at: 41, h: 23, c: 1 }] },
   banded:   { label: 'Band with pinlines', bands: [{ at: 0, h: 42, c: 1 }, { at: 8, h: 5, c: 2 }, { at: 29, h: 5, c: 2 }] },
   stepped:  { label: 'Stepped', bands: [{ at: 0, h: 20, c: 1 }, { at: 26, h: 10, c: 1 }, { at: 42, h: 5, c: 1 }] },
 };
@@ -136,7 +138,7 @@ UB.PATCHES = { none: 'None', mini: 'Mini crest', image: 'Your logo' };
 UB.PANTS_STRIPES = { none: 'None', single: 'Single', outlined: 'Outlined', twin: 'Twin', hem: 'Leg bands' };
 UB.SOCK_STYLES = Object.assign({ match: 'Match jersey hem' },
   Object.fromEntries(Object.entries(UB.STRIPE_SETS).map(([k, v]) => [k, v.label])));
-UB.VIEWS = { player: 'Player', jersey: 'Jersey', flat: 'Flat sheet' };
+UB.VIEWS = { photo: 'Photo', player: 'Player', jersey: 'Jersey', flat: 'Flat sheet' };
 
 /* Starting values for a jersey. Templates only list what they change. */
 UB.DEFAULT_JERSEY = {
@@ -150,6 +152,12 @@ UB.DEFAULT_JERSEY = {
 /* Templates: a jersey style plus which palette slot goes where.
    jersey/socks/pants are merged over the defaults; colors over BASE_COLORS. */
 UB.TEMPLATES = [
+  {
+    id: 'twoband', name: 'Two Band', note: 'Contrast band under an accent band',
+    jersey: { collar: 'vneck', hem: { style: 'pair', offset: 38 }, sleeve: { style: 'pair', offset: 50 } },
+    pants: { stripe: 'none' }, socks: { style: 'pair', offset: 40, size: 1.25 },
+    colors: { stripe1: 'p2', stripe2: 'p1', collar: 'p3', cuffs: 'p0', sockStripe1: 'p2', sockStripe2: 'p1' },
+  },
   {
     id: 'original', name: 'Original Six', note: 'Plain body, thin–thick–thin stripes',
     jersey: { collar: 'laceup', hem: { style: 'classic3', offset: 34 }, sleeve: { style: 'classic3', offset: 26 } },
@@ -227,27 +235,22 @@ UB.TEMPLATES = [
     pants: { stripe: 'outlined' }, socks: { style: 'tricolor' },
     colors: { yoke: 'p2', pattern: 'p2', stripe1: 'p1', stripe2: 'p2', collar: 'p2' },
   },
-  {
-    id: 'speed', name: 'Speedline', note: 'Lines that thicken toward the hem',
-    jersey: { collar: 'vneck', sleeve: { style: 'single', offset: 30 },
-      pattern: { type: 'speed', size: 1, pos: 0, opacity: 1, area: 'body' } },
-    pants: { stripe: 'twin' }, socks: { style: 'stepped' },
-    colors: { pattern: 'p2', stripe1: 'p2', stripe2: 'p1', collar: 'p2' },
-  },
 ];
 
 /* The example team the builder opens with. Change it to your own team. */
 UB.SAMPLE = {
-  team: { name: 'Harbour Storm', palette: UB.SCHEMES[0].colors.slice() },
-  player: { name: 'Lindqvist', number: '27', captain: 'C' },
-  lettering: { numberFont: 'graduate', nameFont: 'graduate', outlines: 2, nameArch: true, sleeveNumbers: true, helmetNumber: true, pantsCrest: true, stick: true },
-  crest: { style: 'roundel', initials: 'HS', wordmark: 'Storm', image: null, scale: 1, patch: 'mini', patchImage: null },
+  team: { name: 'Brantford Bulldogs', palette: UB.SCHEMES[0].colors.slice() },
+  player: { name: 'Hyman', number: '18', captain: 'C' },
+  lettering: { numberFont: 'staat', nameFont: 'staat', outlines: 0, nameArch: false, sleeveNumbers: true, helmetNumber: true, pantsCrest: true, stick: true },
+  crest: { style: 'roundel', initials: 'BB', wordmark: 'Bulldogs', image: null, scale: 1, patch: 'none', patchImage: null },
+  photoLogos: {},
+  active: 'away',
   kits: {
-    home:  { template: 'original', swap: false },
-    away:  { template: 'original', swap: true },
-    third: { template: 'panels', swap: false,
-      colors: { body: 'p4', sleeves: 'p4', yoke: 'p0', pattern: 'p0', stripe1: 'p1', stripe2: 'p0', collar: 'p0',
-        numberOutline: 'p0', socks: 'p4', sockStripe1: 'p1', sockStripe2: 'p0' } },
+    home:  { template: 'twoband', swap: false },
+    away:  { template: 'twoband', swap: true },
+    third: { template: 'heritage', swap: false,
+      colors: { body: 'p2', sleeves: 'p2', yoke: 'p0', yokeTrim: 'p1', stripe1: 'p0', stripe2: 'p1', collar: 'p0',
+        number: 'p0', numberOutline: 'p1', socks: 'p2', sockStripe1: 'p0', sockStripe2: 'p1' } },
   },
 };
 UB.KIT_NAMES = { home: 'Home', away: 'Away', third: 'Third' };

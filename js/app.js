@@ -10,11 +10,11 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const clone = (o) => JSON.parse(JSON.stringify(o));
-  const STORE_KEY = 'hockey-uniform-builder:v1';
+  const STORE_KEY = 'hockey-uniform-builder:v2';
   const UI_KEY = 'hockey-uniform-builder:ui';
 
   let state, history = [], future = [];
-  const ui = { tab: 'template', view: 'player' };
+  const ui = { tab: 'template', view: 'photo' };
 
   /* ---------------- design model ---------------- */
   function deepMerge(base, over) {
@@ -49,7 +49,7 @@
     const s = clone({ ...UB.SAMPLE, kits: undefined });
     s.kits = {};
     for (const k of Object.keys(UB.KIT_NAMES)) s.kits[k] = makeKit(UB.SAMPLE.kits[k] || { template: 'original' });
-    s.active = 'home';
+    s.active = UB.SAMPLE.active || 'home';
     s.version = 1;
     return s;
   }
@@ -143,7 +143,9 @@
     const k = kit(), R = UB.render, X = UB.real;
     const fig = (cls, svg, cap) => `<figure class="part ${cls}">${svg}<figcaption>${cap}</figcaption></figure>`;
     let html;
-    if (ui.view === 'player') {
+    if (ui.view === 'photo') {
+      renderPhoto(k);
+    } else if (ui.view === 'player') {
       html = `<div class="board board-real">` +
         fig('part-player', X.player(state, k, 'front', { attrs: 'role="img" aria-label="Player, front"' }), 'Front') +
         fig('part-player', X.player(state, k, 'back', { attrs: 'role="img" aria-label="Player, back"' }), 'Back') + `</div>`;
@@ -159,12 +161,39 @@
         fig('part-pants', R.pants(state, k, { attrs: 'role="img" aria-label="Pants"' }), 'Pants') +
         fig('part-socks', R.socks(state, k, { attrs: 'role="img" aria-label="Socks"' }), 'Socks') + `</div>`;
     }
-    $('#stage').innerHTML = html;
+    if (html) $('#stage').innerHTML = html;
     $('#stage-kit').textContent = `${UB.KIT_NAMES[state.active]} · ${k.swap ? 'Light' : 'Dark'} sweater`;
     renderContrast();
     renderKitTabs();
     if (ui.tab === 'template') renderTemplates();
     if (ui.tab === 'colours') renderZoneRows();
+  }
+
+  /* Photo view: repaint the mannequin photo off-screen, then swap it in. */
+  const photoBuf = document.createElement('canvas');
+  function renderPhoto(k) {
+    let cv = $('#photo-canvas');
+    if (!cv) {
+      $('#stage').innerHTML = `<div class="board board-photo"><figure class="part part-photo">` +
+        `<canvas id="photo-canvas" width="${UB.PHOTO_ASSETS.width}" height="${UB.PHOTO_ASSETS.height}" role="img" aria-label="Player wearing the uniform"></canvas>` +
+        `<figcaption>Front</figcaption></figure></div>`;
+      cv = $('#photo-canvas');
+    }
+    UB.photo.render(state, k, photoBuf).then((done) => {
+      if (!done || ui.view !== 'photo') return;
+      const c = $('#photo-canvas');
+      if (c) c.getContext('2d').drawImage(photoBuf, 0, 0);
+    });
+  }
+  function photoZone(e) {
+    const c = e.target.closest && e.target.closest('#photo-canvas');
+    if (!c) return null;
+    const r = c.getBoundingClientRect(), W = c.width, H = c.height;
+    // The canvas is letterboxed with object-fit: contain.
+    const s = Math.min(r.width / W, r.height / H), ox = (r.width - W * s) / 2, oy = (r.height - H * s) / 2;
+    const x = (e.clientX - r.left - ox) / s, y = (e.clientY - r.top - oy) / s;
+    if (x < 0 || y < 0 || x >= W || y >= H) return null;
+    return UB.photo.zoneAt(x, y);
   }
 
   function renderContrast() {
@@ -356,6 +385,8 @@
     $('#patch-image-name').textContent = state.crest.patchImage ? 'Patch uploaded' : 'No patch yet';
     $('#btn-crest-clear').hidden = !state.crest.image;
     $('#btn-patch-clear').hidden = !state.crest.patchImage;
+    $$('#photo-logos [data-logo-rm]').forEach((b) => { b.hidden = !(state.photoLogos || {})[b.dataset.logoRm]; });
+    $$('#photo-logos [data-logo-state]').forEach((el) => { el.textContent = (state.photoLogos || {})[el.dataset.logoState] ? 'Added' : 'None'; });
     $$('#copy-from [data-copy]').forEach((b) => { b.hidden = b.dataset.copy === state.active; });
   }
 
@@ -465,6 +496,7 @@
 
   async function exportPng(all) {
     openModal({ title: all ? 'All three kits' : `${UB.KIT_NAMES[state.active]} uniform`, body: '<p class="muted">Drawing the image…</p>' });
+    if (ui.view === 'photo') return exportPhoto(all);
     try {
       const css = await embeddedFontCSS();
       await document.fonts.ready;
@@ -486,7 +518,30 @@
     }
   }
 
+  async function exportPhoto(all) {
+    const keys = all ? ['home', 'away', 'third'] : [state.active];
+    const W = UB.PHOTO_ASSETS.width, H = UB.PHOTO_ASSETS.height;
+    const sheet = document.createElement('canvas');
+    sheet.width = W * keys.length; sheet.height = H;
+    const sx = sheet.getContext('2d');
+    for (let i = 0; i < keys.length; i++) {
+      const c = document.createElement('canvas');
+      await UB.photo.render(state, state.kits[keys[i]], c);
+      sx.drawImage(c, i * W, 0);
+    }
+    const blob = await new Promise((r) => sheet.toBlob(r, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const name = `${slug()}-${all ? 'uniform-set' : state.active}-photo.png`;
+    openModal({
+      title: all ? 'All three kits' : `${UB.KIT_NAMES[state.active]} uniform`,
+      body: `<img class="export-img" src="${url}" alt="Photo mock-up for ${esc(state.team.name)}">` +
+        `<p class="muted">If the download doesn’t start, right-click the image (or press and hold) and save it.</p>`,
+      actions: [{ label: 'Download PNG', primary: true, run: () => download(blob, name) }],
+    });
+  }
+
   async function exportSvg() {
+    if (ui.view === 'photo') { toast('The photo view exports as PNG. Switch to Player, Jersey or Flat for SVG.'); return; }
     const css = await embeddedFontCSS();
     const svg = (ui.view === 'flat' ? UB.render : UB.real).sheet(state, state.active, css);
     download(new Blob([svg], { type: 'image/svg+xml' }), `${slug()}-${state.active}.svg`);
@@ -658,6 +713,12 @@
       }
       if (e.target.closest('[data-pop-close]')) return closePicker();
 
+      const pz = photoZone(e);
+      if (pz) {
+        openPicker(pz, { x: e.clientX, y: e.clientY });
+        hideTip();
+        return;
+      }
       const part = e.target.closest('#stage [data-zone]');
       if (part) {
         openPicker(part.dataset.zone, { x: e.clientX, y: e.clientY });
@@ -691,7 +752,8 @@
     const stage = $('#stage');
     stage.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch') return;
-      const part = e.target.closest('[data-zone]');
+      const pz = photoZone(e);
+      const part = pz ? { dataset: { zone: pz } } : e.target.closest('[data-zone]');
       if (!part) return hideTip();
       const z = UB.ZONES.find((x) => x.id === part.dataset.zone);
       const t = $('#tip');
@@ -723,6 +785,25 @@
     $('#btn-patch-upload').onclick = () => $('#patch-file').click();
     $('#btn-crest-clear').onclick = () => { state.crest.image = null; if (state.crest.style === 'image') state.crest.style = 'roundel'; syncControls(); render(); commit(); };
     $('#btn-patch-clear').onclick = () => { state.crest.patchImage = null; if (state.crest.patch === 'image') state.crest.patch = 'mini'; syncControls(); render(); commit(); };
+
+    // Logos placed on the photo view (chest, collar, pants legs)
+    let logoSlot = null;
+    $('#photo-logos').addEventListener('click', (e) => {
+      const up = e.target.closest('[data-logo-up]'), rm = e.target.closest('[data-logo-rm]');
+      if (up) { logoSlot = up.dataset.logoUp; $('#photo-logo-file').click(); }
+      if (rm) { delete state.photoLogos[rm.dataset.logoRm]; syncControls(); render(); commit(); }
+    });
+    $('#photo-logo-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file || !logoSlot) return;
+      try {
+        state.photoLogos = state.photoLogos || {};
+        state.photoLogos[logoSlot] = await readImage(file);
+        syncControls(); render(); commit();
+        toast('Logo added');
+      } catch (err) { toast(err.message); }
+    });
 
     $('#btn-swap').onclick = () => {
       const k = kit();
@@ -802,7 +883,7 @@
   function boot() {
     try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || '{}')); } catch (e) { /* defaults */ }
     if (!$(`.tabpanel[data-panel="${ui.tab}"]`)) ui.tab = 'template';
-    if (!UB.VIEWS[ui.view]) ui.view = 'player';
+    if (!UB.VIEWS[ui.view] || (ui.view === 'photo' && !UB.PHOTO_ASSETS)) ui.view = UB.PHOTO_ASSETS ? 'photo' : 'player';
     UB.NOISE = makeNoise();
     state = load();
     buildSelects();

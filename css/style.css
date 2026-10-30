@@ -235,6 +235,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .part-jersey { grid-column: span 3; }
 .board-real { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 1000px; }
 .board-real .part { grid-column: span 1; }
+.board-photo { grid-template-columns: minmax(0, 1fr); max-width: 900px; }
+.board-photo .part { grid-column: 1 / -1; }
+.part-photo canvas { width: 100%; height: 100%; object-fit: contain; display: block; cursor: pointer; border-radius: 10px; }
+.logo-slots { display: grid; gap: 6px; }
+.logo-slot { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px; font-size: 14px; }
+.logo-slot small { color: var(--ink-2); font-size: 12px; }
 .part-helmet, .part-pants, .part-socks { grid-column: span 2; }
 .stage [data-zone] { cursor: pointer; }
 
@@ -531,6 +537,7 @@ input[type="text"]:focus, select:focus, textarea:focus { outline: none; border-c
   .stage { overflow: visible; }
   .board, .board.is-full { height: auto; grid-template-rows: auto; }
   .part svg { height: auto; }
+  .part-photo canvas { height: auto; }
   .part-socks svg { max-height: 220px; }
   .panel { border-left: 0; border-top: 1px solid var(--line); }
   .panels { overflow: visible; }
