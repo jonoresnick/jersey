@@ -246,17 +246,20 @@
   let assets = null;
   async function loadAssets() {
     if (assets) return assets;
-    const [base, maps] = await Promise.all([loadImg(A().base), loadImg(A().maps)]);
+    const [base, maps, edge] = await Promise.all([loadImg(A().base), loadImg(A().maps), loadImg(A().edge)]);
     const W = A().width, H = A().height;
     const read = (im) => { const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.drawImage(im, 0, 0); return x.getImageData(0, 0, W, H).data; };
-    const m = read(maps);
+    const m = read(maps), e = edge ? read(edge) : null;
     const n = W * H, lab = new Uint8Array(n), dif = new Float32Array(n), shn = new Float32Array(n);
+    const alpha = new Float32Array(n), seam = [];
     for (let i = 0; i < n; i++) {
       lab[i] = Math.round(m[i * 4 + 2] / 20);
       dif[i] = m[i * 4] / 255;
       shn[i] = m[i * 4 + 1] / 255;
+      alpha[i] = e ? e[i * 4] / 255 : (lab[i] ? 1 : 0);
+      if (e && e[i * 4 + 1] > 127) seam.push(i);
     }
-    assets = { W, H, base: read(base), lab, dif, shn };
+    assets = { W, H, base: read(base), lab, dif, shn, alpha, seam: Int32Array.from(seam) };
     return assets;
   }
 
@@ -287,14 +290,29 @@
     const solidOf = [null, null, null, null, solid.collar, null, null, solid.gloves, solid.glovesTrim, solid.helmet];
     const n = W * H, stride = W * H * 4;
     for (let i = 0; i < n; i++) {
-      const p = i * 4, l = a.lab[i];
-      if (!l) { o[p] = base[p]; o[p + 1] = base[p + 1]; o[p + 2] = base[p + 2]; o[p + 3] = 255; continue; }
+      const p = i * 4, l = a.lab[i], k = a.alpha[i];
+      o[p + 3] = 255;
+      if (!l || k <= 0) { o[p] = base[p]; o[p + 1] = base[p + 1]; o[p + 2] = base[p + 2]; continue; }
       let r, g, b;
       const ly = layerOf[l];
       if (ly !== null) { const q = p + ly * stride; r = ad[q]; g = ad[q + 1]; b = ad[q + 2]; }
       else { const s = solidOf[l]; r = s[0]; g = s[1]; b = s[2]; }
       const D = a.dif[i], S = a.shn[i] * 255;
-      o[p] = r * D + S; o[p + 1] = g * D + S; o[p + 2] = b * D + S; o[p + 3] = 255;
+      r = r * D + S; g = g * D + S; b = b * D + S;
+      if (k < 1) { const j = 1 - k; r = r * k + base[p] * j; g = g * k + base[p + 1] * j; b = b * k + base[p + 2] * j; }
+      o[p] = r; o[p + 1] = g; o[p + 2] = b;
+    }
+    // Where two parts meet (jersey and pants, sleeve and glove…), soften the join.
+    if (a.seam.length) {
+      const src = new Uint8ClampedArray(o);
+      for (const i of a.seam) {
+        const x = i % W, y = (i - x) / W;
+        if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
+        for (let c = 0; c < 3; c++) {
+          const p = i * 4 + c, r = W * 4;
+          o[p] = (src[p] * 4 + (src[p - 4] + src[p + 4] + src[p - r] + src[p + r]) * 2 + src[p - r - 4] + src[p - r + 4] + src[p + r - 4] + src[p + r + 4]) / 16;
+        }
+      }
     }
     ctx.putImageData(out, 0, 0);
     return true;
