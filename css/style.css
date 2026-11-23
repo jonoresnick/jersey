@@ -237,6 +237,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .board-real .part { grid-column: span 1; }
 .board-photo { grid-template-columns: minmax(0, 1fr); max-width: 900px; }
 .board-photo .part { grid-column: 1 / -1; }
+.part-model { width: 100%; height: 100%; }
+.model-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background: radial-gradient(ellipse at 50% 38%, #cfd2d4 0%, #a9adb0 45%, #7f8386 100%);
+}
+.model-wrap:active { cursor: grabbing; }
+.model-wrap canvas { display: block; }
 .part-photo canvas { width: 100%; height: 100%; object-fit: contain; display: block; cursor: pointer; border-radius: 10px; }
 .logo-slots { display: grid; gap: 6px; }
 .logo-slot { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px; font-size: 14px; }
@@ -537,7 +550,20 @@ input[type="text"]:focus, select:focus, textarea:focus { outline: none; border-c
   .stage { overflow: visible; }
   .board, .board.is-full { height: auto; grid-template-rows: auto; }
   .part svg { height: auto; }
-  .part-photo canvas { height: auto; }
+  .part-model { width: 100%; height: 100%; }
+.model-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background: radial-gradient(ellipse at 50% 38%, #cfd2d4 0%, #a9adb0 45%, #7f8386 100%);
+}
+.model-wrap:active { cursor: grabbing; }
+.model-wrap canvas { display: block; }
+.part-photo canvas { height: auto; }
   .part-socks svg { max-height: 220px; }
   .panel { border-left: 0; border-top: 1px solid var(--line); }
   .panels { overflow: visible; }
@@ -558,3 +584,43 @@ input[type="text"]:focus, select:focus, textarea:focus { outline: none; border-c
 @media (prefers-reduced-motion: no-preference) {
   .tpl, .btn, .seg button, .zone-row { transition: border-color 0.12s, background-color 0.12s, box-shadow 0.12s; }
 }
+
+/* ---------- logo upload boxes ---------- */
+.drops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.drop {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.drop.is-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.drop-box {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  aspect-ratio: 16 / 10;
+  max-width: 100%;
+  border: 1.5px dashed var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 8px;
+}
+.drop-box:hover, .drop.is-over .drop-box { border-color: var(--accent); color: var(--accent); }
+.drop.has-image .drop-box { border-style: solid; }
+.drop-preview { display: grid; place-items: center; width: 100%; height: 100%; min-height: 0; }
+.drop-preview img { max-width: 100%; max-height: 72px; object-fit: contain; }
+.drop-cta { font-size: 11px; font-weight: 600; }
+.drop.has-image .drop-cta { display: none; }
+.drop-text { display: grid; gap: 2px; min-width: 0; }
+.drop-text strong { font-size: 13px; }
+.drop-text span { font-size: 12px; color: var(--ink-2); }
+.drop-text .seg { margin-top: 4px; }
+.drop .link-btn { justify-self: start; }
+.drop[data-drop="crest"] { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; column-gap: 12px; }
+.drop[data-drop="crest"] .drop-box { grid-row: span 2; }
+.drop[data-drop="crest"] .drop-preview img { max-height: 110px; }

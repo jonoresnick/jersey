@@ -134,11 +134,12 @@ UB.SWEATERS = { false: 'Dark (home)', true: 'Light (away)' };
 UB.OUTLINES = { 0: 'None', 1: 'Single', 2: 'Double' };
 UB.CAPTAIN = { none: 'None', C: 'C', A: 'A' };
 UB.CREST_STYLES = { roundel: 'Roundel', shield: 'Shield', wordmark: 'Wordmark', initials: 'Initials', image: 'Your logo', none: 'None' };
+UB.CREST_TEXT_STYLES = { roundel: 'Roundel', shield: 'Shield', wordmark: 'Wordmark', initials: 'Initials', none: 'None' };
 UB.PATCHES = { none: 'None', mini: 'Mini crest', image: 'Your logo' };
 UB.PANTS_STRIPES = { none: 'None', single: 'Single', outlined: 'Outlined', twin: 'Twin', hem: 'Leg bands' };
 UB.SOCK_STYLES = Object.assign({ match: 'Match jersey hem' },
   Object.fromEntries(Object.entries(UB.STRIPE_SETS).map(([k, v]) => [k, v.label])));
-UB.VIEWS = { photo: 'Photo', player: 'Player', jersey: 'Jersey', flat: 'Flat sheet' };
+UB.VIEWS = { photo: 'Photo', model: '3D' };
 
 /* Starting values for a jersey. Templates only list what they change. */
 UB.DEFAULT_JERSEY = {

@@ -69,6 +69,7 @@
     if (!Array.isArray(out.team.palette) || out.team.palette.length < 5) out.team.palette = base.team.palette;
     out.team.palette = out.team.palette.slice(0, 5).map((c) => (UB.isHex(c) ? c : '#888888'));
     if (!UB.KIT_NAMES[out.active]) out.active = 'home';
+    if (out.photoLogos && out.photoLogos.chestR && !out.photoLogos.sponsor) out.photoLogos = { ...out.photoLogos, sponsor: out.photoLogos.chestR };
     return out;
   }
 
@@ -140,28 +141,9 @@
   }
 
   function doRender() {
-    const k = kit(), R = UB.render, X = UB.real;
-    const fig = (cls, svg, cap) => `<figure class="part ${cls}">${svg}<figcaption>${cap}</figcaption></figure>`;
-    let html;
-    if (ui.view === 'photo') {
-      renderPhoto(k);
-    } else if (ui.view === 'player') {
-      html = `<div class="board board-real">` +
-        fig('part-player', X.player(state, k, 'front', { attrs: 'role="img" aria-label="Player, front"' }), 'Front') +
-        fig('part-player', X.player(state, k, 'back', { attrs: 'role="img" aria-label="Player, back"' }), 'Back') + `</div>`;
-    } else if (ui.view === 'jersey') {
-      html = `<div class="board board-real">` +
-        fig('part-real-jersey', X.jersey(state, k, 'front', { attrs: 'role="img" aria-label="Jersey front"' }), 'Front') +
-        fig('part-real-jersey', X.jersey(state, k, 'back', { attrs: 'role="img" aria-label="Jersey back"' }), 'Back') + `</div>`;
-    } else {
-      html = `<div class="board is-full">` +
-        fig('part-jersey', R.jersey(state, k, 'front', { attrs: 'role="img" aria-label="Jersey front"' }), 'Front') +
-        fig('part-jersey', R.jersey(state, k, 'back', { attrs: 'role="img" aria-label="Jersey back"' }), 'Back') +
-        fig('part-helmet', R.helmet(state, k, { attrs: 'role="img" aria-label="Helmet"' }), 'Helmet') +
-        fig('part-pants', R.pants(state, k, { attrs: 'role="img" aria-label="Pants"' }), 'Pants') +
-        fig('part-socks', R.socks(state, k, { attrs: 'role="img" aria-label="Socks"' }), 'Socks') + `</div>`;
-    }
-    if (html) $('#stage').innerHTML = html;
+    const k = kit();
+    if (ui.view === 'model' && UB.model3d.available()) renderModel(k);
+    else renderPhoto(k);
     $('#stage-kit').textContent = `${UB.KIT_NAMES[state.active]} · ${k.swap ? 'Light' : 'Dark'} sweater`;
     renderContrast();
     renderKitTabs();
@@ -169,9 +151,22 @@
     if (ui.tab === 'colours') renderZoneRows();
   }
 
+  /* 3D view: one WebGL canvas that stays alive while the view is open. */
+  function renderModel(k) {
+    let wrap = $('#model-wrap');
+    if (!wrap) {
+      $('#stage').innerHTML = `<div class="board board-photo"><figure class="part part-model">` +
+        `<div id="model-wrap" class="model-wrap" role="img" aria-label="3D player wearing the uniform"></div>` +
+        `<figcaption>Drag to turn · scroll to zoom</figcaption></figure></div>`;
+      wrap = $('#model-wrap');
+    }
+    UB.model3d.show(wrap, state, k);
+  }
+
   /* Photo view: repaint the mannequin photo off-screen, then swap it in. */
   const photoBuf = document.createElement('canvas');
   function renderPhoto(k) {
+    UB.model3d.hide();
     let cv = $('#photo-canvas');
     if (!cv) {
       $('#stage').innerHTML = `<div class="board board-photo"><figure class="part part-photo">` +
@@ -184,6 +179,13 @@
       const c = $('#photo-canvas');
       if (c) c.getContext('2d').drawImage(photoBuf, 0, 0);
     });
+  }
+  // Click (not drag) on the 3D view picks the part under the pointer.
+  let downAt = null;
+  function modelZone(e) {
+    if (!e.target.closest || !e.target.closest('#model-wrap')) return null;
+    if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return null;
+    return UB.model3d.zoneAt(e.clientX, e.clientY);
   }
   function photoZone(e) {
     const c = e.target.closest && e.target.closest('#photo-canvas');
@@ -381,12 +383,7 @@
     });
     const n = state.player.number;
     $('#number-note').textContent = n === '99' ? '99 is retired across the NHL.' : n === '0' || n === '00' ? 'The NHL doesn’t issue 0 or 00.' : '';
-    $('#crest-image-name').textContent = state.crest.image ? 'Logo uploaded' : 'No logo yet';
-    $('#patch-image-name').textContent = state.crest.patchImage ? 'Patch uploaded' : 'No patch yet';
-    $('#btn-crest-clear').hidden = !state.crest.image;
-    $('#btn-patch-clear').hidden = !state.crest.patchImage;
-    $$('#photo-logos [data-logo-rm]').forEach((b) => { b.hidden = !(state.photoLogos || {})[b.dataset.logoRm]; });
-    $$('#photo-logos [data-logo-state]').forEach((el) => { el.textContent = (state.photoLogos || {})[el.dataset.logoState] ? 'Added' : 'None'; });
+    syncDrops();
     $$('#copy-from [data-copy]').forEach((b) => { b.hidden = b.dataset.copy === state.active; });
   }
 
@@ -416,6 +413,40 @@
     if (commitNow) commit();
   }
 
+  /* ---------------- logo slots ---------------- */
+  const logo = (key) => ({
+    get: () => (state.photoLogos || {})[key],
+    set: (v) => { state.photoLogos = { ...(state.photoLogos || {}), [key]: v || null }; },
+  });
+  const LOGO_SLOTS = {
+    crest: { label: 'Crest', get: () => state.crest.image, set: (v) => {
+      state.crest.image = v;
+      if (v) state.crest.style = 'image';
+      else if (state.crest.style === 'image') state.crest.style = 'roundel';
+    } },
+    sponsor: { label: 'Sponsor', ...logo('sponsor') },
+    captain: { label: 'Captaincy patch', ...logo('captain') },
+    shoulders: { label: 'Shoulder patch', get: () => state.crest.patchImage, set: (v) => {
+      state.crest.patchImage = v;
+      state.crest.patch = v ? 'image' : 'none';
+    } },
+    neck: { label: 'Collar logo', ...logo('neck') },
+    pantsL: { label: 'Left pants logo', ...logo('pantsL') },
+    pantsR: { label: 'Right pants logo', ...logo('pantsR') },
+  };
+  function syncDrops() {
+    $$('#drops .drop').forEach((box) => {
+      const img = LOGO_SLOTS[box.dataset.drop].get();
+      const prev = box.querySelector('[data-drop-preview]');
+      if (prev.dataset.src !== (img || '')) {
+        prev.dataset.src = img || '';
+        prev.innerHTML = img ? `<img src="${img}" alt="">` : ICON.upload;
+      }
+      box.classList.toggle('has-image', !!img);
+      box.querySelector('[data-drop-rm]').hidden = !img;
+    });
+  }
+
   /* ---------------- images ---------------- */
   function readImage(file) {
     return new Promise((resolveP, reject) => {
@@ -441,47 +472,6 @@
   }
 
   /* ---------------- export ---------------- */
-  const fontCache = {};
-  async function embeddedFontCSS() {
-    const fams = new Set(['Saira+Condensed:wght@600;700;800']);
-    fams.add(UB.FONTS[state.lettering.numberFont].gf);
-    fams.add(UB.FONTS[state.lettering.nameFont].gf);
-    const url = 'https://fonts.googleapis.com/css2?' + [...fams].map((f) => 'family=' + f).join('&') + '&display=block';
-    if (fontCache[url]) return fontCache[url];
-    try {
-      let css = await (await fetch(url)).text();
-      // Keep only the latin subsets to keep the file small.
-      css = css.split('/* ').filter((b) => b && (b.startsWith('latin */') || !b.includes('*/'))).map((b) => '/* ' + b).join('');
-      const urls = [...new Set([...css.matchAll(/url\((https:[^)]+)\)/g)].map((m) => m[1]))];
-      for (const u of urls) {
-        const blob = await (await fetch(u)).blob();
-        const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-        css = css.split(u).join(data);
-      }
-      fontCache[url] = css;
-      return css;
-    } catch (e) {
-      return `@import url('${url.replace('display=block', 'display=swap')}');`;
-    }
-  }
-
-  function svgToPng(svg, w, h, scale = 2) {
-    return new Promise((resolveP, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement('canvas');
-        c.width = w * scale;
-        c.height = h * scale;
-        const ctx = c.getContext('2d');
-        ctx.scale(scale, scale);
-        ctx.drawImage(img, 0, 0, w, h);
-        c.toBlob((b) => (b ? resolveP(b) : reject(new Error('The image could not be created.'))), 'image/png');
-      };
-      img.onerror = () => reject(new Error('The image could not be created.'));
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    });
-  }
-
   function download(blob, filename) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -496,26 +486,39 @@
 
   async function exportPng(all) {
     openModal({ title: all ? 'All three kits' : `${UB.KIT_NAMES[state.active]} uniform`, body: '<p class="muted">Drawing the image…</p>' });
-    if (ui.view === 'photo') return exportPhoto(all);
     try {
-      const css = await embeddedFontCSS();
-      await document.fonts.ready;
-      const flat = ui.view === 'flat';
-      const lib = flat ? UB.render : UB.real;
-      const svg = all ? lib.lineup(state, css) : lib.sheet(state, state.active, css);
-      const [w, h] = flat ? (all ? [1500, 1060] : [1400, 1180]) : (all ? [1840, 1380] : [1840, 1330]);
-      const blob = await svgToPng(svg, w, h);
-      const url = URL.createObjectURL(blob);
-      const name = `${slug()}-${all ? 'uniform-set' : state.active}.png`;
-      openModal({
-        title: all ? 'All three kits' : `${UB.KIT_NAMES[state.active]} uniform`,
-        body: `<img class="export-img" src="${url}" alt="Uniform sheet for ${esc(state.team.name)}">` +
-          `<p class="muted">If the download doesn’t start, right-click the image (or press and hold) and save it.</p>`,
-        actions: [{ label: 'Download PNG', primary: true, run: () => download(blob, name) }],
-      });
+      if (ui.view === 'model' && UB.model3d.available()) await exportModel(all);
+      else await exportPhoto(all);
     } catch (e) {
-      openModal({ title: 'Export failed', body: `<p>${esc(e.message)} Try again, or export an SVG instead.</p>` });
+      openModal({ title: 'Export failed', body: `<p>${esc(e.message)} Try again.</p>` });
     }
+  }
+
+  async function exportModel(all) {
+    const keys = all ? ['home', 'away', 'third'] : [state.active];
+    const W = 1200, H = 1500;
+    const sheet = document.createElement('canvas');
+    sheet.width = W * keys.length; sheet.height = H;
+    const sx = sheet.getContext('2d');
+    sx.fillStyle = '#8f9396';
+    const g = sx.createRadialGradient(sheet.width / 2, H * 0.4, 50, sheet.width / 2, H * 0.5, Math.max(sheet.width, H));
+    g.addColorStop(0, '#c9ccce'); g.addColorStop(1, '#7d8184');
+    sx.fillStyle = g; sx.fillRect(0, 0, sheet.width, H);
+    for (let i = 0; i < keys.length; i++) {
+      const url = await UB.model3d.snapshot(state, state.kits[keys[i]], W, H);
+      const im = await new Promise((r) => { const x = new Image(); x.onload = () => r(x); x.src = url; });
+      sx.drawImage(im, i * W, 0);
+    }
+    await UB.model3d.repaint(state, kit());
+    const blob = await new Promise((r) => sheet.toBlob(r, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const name = `${slug()}-${all ? 'uniform-set' : state.active}-3d.png`;
+    openModal({
+      title: all ? 'All three kits' : `${UB.KIT_NAMES[state.active]} uniform`,
+      body: `<img class="export-img" src="${url}" alt="3D render of the uniform for ${esc(state.team.name)}">` +
+        `<p class="muted">Turn the player first to export a different angle. If the download doesn’t start, right-click the image and save it.</p>`,
+      actions: [{ label: 'Download PNG', primary: true, run: () => download(blob, name) }],
+    });
   }
 
   async function exportPhoto(all) {
@@ -538,14 +541,6 @@
         `<p class="muted">If the download doesn’t start, right-click the image (or press and hold) and save it.</p>`,
       actions: [{ label: 'Download PNG', primary: true, run: () => download(blob, name) }],
     });
-  }
-
-  async function exportSvg() {
-    if (ui.view === 'photo') { toast('The photo view exports as PNG. Switch to Player, Jersey or Flat for SVG.'); return; }
-    const css = await embeddedFontCSS();
-    const svg = (ui.view === 'flat' ? UB.render : UB.real).sheet(state, state.active, css);
-    download(new Blob([svg], { type: 'image/svg+xml' }), `${slug()}-${state.active}.svg`);
-    toast('SVG exported');
   }
 
   function designJSON() { return JSON.stringify({ ...state, version: 1 }, null, 2); }
@@ -595,6 +590,7 @@
 
   /* ---------------- icons ---------------- */
   const ICON = {
+    upload: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     close: '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   };
 
@@ -713,8 +709,8 @@
       }
       if (e.target.closest('[data-pop-close]')) return closePicker();
 
-      const pz = photoZone(e);
-      if (pz) {
+      const pz = photoZone(e) || modelZone(e);
+      if (pz && UB.ZONES.some((z) => z.id === pz)) {
         openPicker(pz, { x: e.clientX, y: e.clientY });
         hideTip();
         return;
@@ -752,8 +748,9 @@
     const stage = $('#stage');
     stage.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch') return;
-      const pz = photoZone(e);
-      const part = pz ? { dataset: { zone: pz } } : e.target.closest('[data-zone]');
+      if (e.buttons) return hideTip();
+      const pz = photoZone(e) || modelZone(e);
+      const part = pz && UB.ZONES.some((z) => z.id === pz) ? { dataset: { zone: pz } } : null;
       if (!part) return hideTip();
       const z = UB.ZONES.find((x) => x.id === part.dataset.zone);
       const t = $('#tip');
@@ -763,46 +760,51 @@
       t.style.top = e.clientY + 16 + 'px';
     });
     stage.addEventListener('pointerleave', hideTip);
+    stage.addEventListener('pointerdown', (e) => { downAt = [e.clientX, e.clientY]; });
 
-    // Image uploads
-    const upload = (input, key, label) => input.addEventListener('change', async () => {
-      const file = input.files[0];
-      input.value = '';
-      if (!file) return;
+    // Logo upload boxes: click to choose a file, or drop an image on the box.
+    let pickSlot = null;
+    const drops = $('#drops');
+    const accept = async (slot, file) => {
       try {
-        state.crest[key] = await readImage(file);
-        if (key === 'image') state.crest.style = 'image';
-        if (key === 'patchImage') state.crest.patch = 'image';
-        syncControls();
-        render();
-        commit();
-        toast(label);
+        LOGO_SLOTS[slot].set(await readImage(file));
+        syncControls(); render(); commit();
+        toast(`${LOGO_SLOTS[slot].label} added`);
       } catch (err) { toast(err.message); }
+    };
+    drops.addEventListener('click', (e) => {
+      const box = e.target.closest('.drop');
+      if (!box) return;
+      if (e.target.closest('[data-drop-rm]')) {
+        LOGO_SLOTS[box.dataset.drop].set(null);
+        syncControls(); render(); commit();
+        return;
+      }
+      if (e.target.closest('[data-drop-pick]')) { pickSlot = box.dataset.drop; $('#logo-file').click(); }
     });
-    upload($('#crest-file'), 'image', 'Logo added to the crest');
-    upload($('#patch-file'), 'patchImage', 'Logo added to the shoulders');
-    $('#btn-crest-upload').onclick = () => $('#crest-file').click();
-    $('#btn-patch-upload').onclick = () => $('#patch-file').click();
-    $('#btn-crest-clear').onclick = () => { state.crest.image = null; if (state.crest.style === 'image') state.crest.style = 'roundel'; syncControls(); render(); commit(); };
-    $('#btn-patch-clear').onclick = () => { state.crest.patchImage = null; if (state.crest.patch === 'image') state.crest.patch = 'mini'; syncControls(); render(); commit(); };
-
-    // Logos placed on the photo view (chest, collar, pants legs)
-    let logoSlot = null;
-    $('#photo-logos').addEventListener('click', (e) => {
-      const up = e.target.closest('[data-logo-up]'), rm = e.target.closest('[data-logo-rm]');
-      if (up) { logoSlot = up.dataset.logoUp; $('#photo-logo-file').click(); }
-      if (rm) { delete state.photoLogos[rm.dataset.logoRm]; syncControls(); render(); commit(); }
-    });
-    $('#photo-logo-file').addEventListener('change', async (e) => {
+    $('#logo-file').addEventListener('change', (e) => {
       const file = e.target.files[0];
       e.target.value = '';
-      if (!file || !logoSlot) return;
-      try {
-        state.photoLogos = state.photoLogos || {};
-        state.photoLogos[logoSlot] = await readImage(file);
-        syncControls(); render(); commit();
-        toast('Logo added');
-      } catch (err) { toast(err.message); }
+      if (file && pickSlot) accept(pickSlot, file);
+    });
+    drops.addEventListener('dragover', (e) => {
+      const box = e.target.closest('.drop');
+      if (!box) return;
+      e.preventDefault();
+      $$('.drop.is-over').forEach((x) => x !== box && x.classList.remove('is-over'));
+      box.classList.add('is-over');
+    });
+    drops.addEventListener('dragleave', (e) => {
+      const box = e.target.closest('.drop');
+      if (box && !box.contains(e.relatedTarget)) box.classList.remove('is-over');
+    });
+    drops.addEventListener('drop', (e) => {
+      const box = e.target.closest('.drop');
+      if (!box) return;
+      e.preventDefault();
+      box.classList.remove('is-over');
+      const file = e.dataTransfer.files[0];
+      if (file) accept(box.dataset.drop, file);
     });
 
     $('#btn-swap').onclick = () => {
@@ -830,7 +832,6 @@
   const ACTIONS = {
     png: () => exportPng(false),
     pngAll: () => exportPng(true),
-    svg: () => exportSvg(),
     save: () => { download(new Blob([designJSON()], { type: 'application/json' }), `${slug()}-uniform.json`); toast('Design file saved'); },
     open: () => $('#design-file').click(),
     copy: () => {
@@ -857,34 +858,11 @@
     }),
   };
 
-  /* A small fabric-weave texture (mid-grey = no change under hard-light). */
-  function makeNoise() {
-    try {
-      const n = 160, c = document.createElement('canvas');
-      c.width = c.height = n;
-      const ctx = c.getContext('2d'), img = ctx.createImageData(n, n);
-      let seed = 1;
-      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-      for (let y = 0; y < n; y++) {
-        for (let x = 0; x < n; x++) {
-          const weave = ((x + y) % 4 < 2 ? 6 : -6) + (y % 3 === 0 ? -5 : 0) + (x % 3 === 0 ? 4 : 0);
-          const v = 128 + weave + (rnd() - 0.5) * 34;
-          const i = (y * n + x) * 4;
-          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-          img.data[i + 3] = 255;
-        }
-      }
-      ctx.putImageData(img, 0, 0);
-      return c.toDataURL('image/png');
-    } catch (e) { return null; }
-  }
-
   /* ---------------- boot ---------------- */
   function boot() {
     try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || '{}')); } catch (e) { /* defaults */ }
     if (!$(`.tabpanel[data-panel="${ui.tab}"]`)) ui.tab = 'template';
-    if (!UB.VIEWS[ui.view] || (ui.view === 'photo' && !UB.PHOTO_ASSETS)) ui.view = UB.PHOTO_ASSETS ? 'photo' : 'player';
-    UB.NOISE = makeNoise();
+    if (!UB.VIEWS[ui.view]) ui.view = 'photo';
     state = load();
     buildSelects();
     buildSegs();

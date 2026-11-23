@@ -27,7 +27,7 @@
   const norm = (x, y) => { const l = Math.hypot(x, y); return [x / l, y / l]; };
   const GEO = {
     torso: { hem: (x) => 688 + (x - 200) * 0.0115, k: 1.3, x0: 190, x1: 560, bow: 3,
-      crest: [403, 433, 196], captain: [490, 330, 54], chestL: [335, 308, 76, 30], chestR: [452, 311, 36, 30], neck: [407, 262, 30, 18],
+      crest: [403, 433, 196], captain: [336, 312, 54], sponsor: [470, 312, 84, 36], neck: [407, 262, 30, 18],
       flat: 'translate(381 215) scale(1.9 1.3) translate(-200 -38)', pattern: 'translate(381 215) scale(1.6) translate(-200 -38)' },
     sleeves: [
       { o: [140, 528], dir: norm(1, 0.36), k: 1.25, num: [181, 326, 17, 1, 92] },
@@ -215,9 +215,14 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, A().width, H); ctx.clip();
     await drawCrest(ctx, d, kit, T.crest[0], T.crest[1], T.crest[2] * (d.crest.scale || 1));
-    if (d.player.captain && d.player.captain !== 'none') drawText(ctx, d.player.captain, T.captain[0], T.captain[1], T.captain[2] * nf.size, nf, cols, Math.min(L.outlines, 1), 50);
-    drawImageIn(ctx, await loadImg(logos.chestL), T.chestL[0], T.chestL[1], T.chestL[2], T.chestL[3]);
-    drawImageIn(ctx, await loadImg(logos.chestR), T.chestR[0], T.chestR[1], T.chestR[2], T.chestR[3]);
+    // Captaincy: an uploaded patch, or the letter (top left of the chest)
+    if (d.player.captain && d.player.captain !== 'none') {
+      const [cx, cy, size] = T.captain;
+      if (logos.captain) drawImageIn(ctx, await loadImg(logos.captain), cx, cy, size, size);
+      else drawText(ctx, d.player.captain, cx, cy + size * nf.size * 0.36, size * nf.size, nf, cols, Math.min(L.outlines, 1), 50);
+    }
+    // Sponsor (top right of the chest)
+    drawImageIn(ctx, await loadImg(logos.sponsor), T.sponsor[0], T.sponsor[1], T.sponsor[2], T.sponsor[3]);
     drawImageIn(ctx, await loadImg(logos.neck), T.neck[0], T.neck[1], T.neck[2], T.neck[3]);
     ctx.restore();
     // Sleeves
@@ -326,4 +331,6 @@
   }
 
   UB.photo = { render, zoneAt, available: () => !!UB.PHOTO_ASSETS, GEO };
+  /* Shared with the 3D view: lettering, crest and logo drawing on a 2D canvas. */
+  UB.paint = { drawText, drawCrest, drawImageIn, loadImg, fontOf, canvasFont };
 })();

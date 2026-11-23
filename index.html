@@ -41,7 +41,6 @@
           <span class="menu-label">Image</span>
           <button type="button" data-action="png">PNG of this kit</button>
           <button type="button" data-action="pngAll">PNG of all three kits</button>
-          <button type="button" data-action="svg">SVG of this kit</button>
           <span class="menu-label">Design</span>
           <button type="button" data-action="save">Save design file</button>
           <button type="button" data-action="open">Open design file…</button>
@@ -60,14 +59,12 @@
         <div class="stage-title"><span class="eyebrow">Editing</span><strong id="stage-kit">Home</strong></div>
         <div class="seg seg-sm" id="view-seg" role="group" aria-label="Preview">
           <button type="button" data-view="photo" aria-pressed="true">Photo</button>
-          <button type="button" data-view="player" aria-pressed="false">Player</button>
-          <button type="button" data-view="jersey" aria-pressed="false">Jersey</button>
-          <button type="button" data-view="flat" aria-pressed="false">Flat sheet</button>
+          <button type="button" data-view="model" aria-pressed="false">3D</button>
         </div>
       </div>
       <div id="stage" class="stage"></div>
       <div class="stage-foot">
-        <span class="hint">Click any part of the uniform to change its colour.</span>
+        <span class="hint">Click any part to change its colour.</span>
         <span class="contrast" id="contrast"></span>
       </div>
     </section>
@@ -78,7 +75,7 @@
         <button type="button" class="tab" role="tab" data-tab="colours">Colours</button>
         <button type="button" class="tab" role="tab" data-tab="jersey">Stripes &amp; patterns</button>
         <button type="button" class="tab" role="tab" data-tab="lettering">Name &amp; number</button>
-        <button type="button" class="tab" role="tab" data-tab="crest">Crest</button>
+        <button type="button" class="tab" role="tab" data-tab="crest">Logos</button>
         <button type="button" class="tab" role="tab" data-tab="kit">Pants &amp; gear</button>
       </div>
 
@@ -180,7 +177,6 @@
               <div class="field num"><label class="field-label" for="player-number">Number</label><input type="text" id="player-number" data-bind="player.number" data-digits inputmode="numeric" maxlength="2"></div>
             </div>
             <p class="help warn" id="number-note" aria-live="polite"></p>
-            <div class="field"><span class="field-label">Captaincy letter</span><div class="seg" data-seg="player.captain" data-source="CAPTAIN" role="group" aria-label="Captaincy letter"></div></div>
           </div>
           <div class="group">
             <h3>Number font</h3>
@@ -199,48 +195,79 @@
         <!-- CREST -->
         <section class="tabpanel" data-panel="crest" role="tabpanel" hidden>
           <div class="group">
-            <h3>Chest crest</h3>
-            <div class="seg seg-wrap" data-seg="crest.style" data-source="CREST_STYLES" role="group" aria-label="Crest style"></div>
+            <h3>Logos</h3>
+            <p class="help">Drop an image on a box, or click it to choose a file. PNGs with a transparent background look best.</p>
+            <div class="drops" id="drops">
+              <div class="drop" data-drop="crest">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload chest crest image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Chest crest</strong><span>Centre of the jersey</span></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+              <div class="drop" data-drop="sponsor">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload sponsor image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Sponsor</strong><span>Top right of the chest</span></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+              <div class="drop" data-drop="captain">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload captaincy patch image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Captaincy patch</strong><span>Top left of the chest</span><div class="seg seg-sm" data-seg="player.captain" data-source="CAPTAIN" role="group" aria-label="Captaincy letter"></div></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+              <div class="drop" data-drop="shoulders">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload shoulder patches image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Shoulder patches</strong><span>Both shoulders</span></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+              <div class="drop" data-drop="neck">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload collar image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Collar</strong><span>Just below the neckline</span></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+              <div class="drop" data-drop="pantsL">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload pants, left leg image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Pants, left leg</strong><span>Front of the leg</span></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+              <div class="drop" data-drop="pantsR">
+                <button type="button" class="drop-box" data-drop-pick aria-label="Upload pants, right leg image">
+                  <span class="drop-preview" data-drop-preview></span>
+                  <span class="drop-cta">Drop image or click</span>
+                </button>
+                <div class="drop-text"><strong>Pants, right leg</strong><span>Front of the leg</span></div>
+                <button type="button" class="link-btn" data-drop-rm>Remove</button>
+              </div>
+            </div>
+          </div>
+          <div class="group" data-hide-if="crest.style=image">
+            <h3>No crest logo yet?</h3>
+            <p class="help">Use a text crest until you upload one.</p>
+            <div class="seg seg-wrap" data-seg="crest.style" data-source="CREST_TEXT_STYLES" role="group" aria-label="Text crest style"></div>
             <div class="field" data-show-if="crest.style=roundel|shield|initials"><label class="field-label" for="crest-initials">Initials</label><input type="text" id="crest-initials" data-bind="crest.initials" maxlength="4" spellcheck="false"></div>
             <div class="field" data-show-if="crest.style=wordmark"><label class="field-label" for="crest-wordmark">Wordmark</label><input type="text" id="crest-wordmark" data-bind="crest.wordmark" maxlength="14" spellcheck="false"></div>
-            <div class="field" data-show-if="crest.style=image">
-              <span class="field-label">Your logo</span>
-              <div class="upload">
-                <button type="button" class="btn btn-sm" id="btn-crest-upload">Upload image</button>
-                <span class="muted" id="crest-image-name"></span>
-                <button type="button" class="link-btn" id="btn-crest-clear">Remove</button>
-              </div>
-              <p class="help">PNG with a transparent background works best.</p>
-            </div>
-            <div data-hide-if="crest.style=none">
-              <div class="range"><label for="crest-scale">Size</label><input type="range" id="crest-scale" data-bind="crest.scale" min="0.6" max="1.3" step="0.05" data-unit="%"><output for="crest-scale"></output></div>
-            </div>
           </div>
-          <div class="group">
-            <h3>Shoulder patches</h3>
-            <div class="seg" data-seg="crest.patch" data-source="PATCHES" role="group" aria-label="Shoulder patches"></div>
-            <div class="field" data-show-if="crest.patch=image">
-              <div class="upload">
-                <button type="button" class="btn btn-sm" id="btn-patch-upload">Upload image</button>
-                <span class="muted" id="patch-image-name"></span>
-                <button type="button" class="link-btn" id="btn-patch-clear">Remove</button>
-              </div>
-            </div>
-          </div>
-                  <div class="group">
-            <h3>Logos on the photo</h3>
-            <p class="help">Extra logos for the Photo view, such as a league patch, sponsor or the brand marks on the pants. PNGs with transparent backgrounds look best.</p>
-            <div class="logo-slots" id="photo-logos">
-              <div class="logo-slot"><span>Left chest</span><small data-logo-state="chestL"></small><button type="button" class="btn btn-sm" data-logo-up="chestL">Upload</button><button type="button" class="link-btn" data-logo-rm="chestL">Remove</button></div>
-              <div class="logo-slot"><span>Right chest</span><small data-logo-state="chestR"></small><button type="button" class="btn btn-sm" data-logo-up="chestR">Upload</button><button type="button" class="link-btn" data-logo-rm="chestR">Remove</button></div>
-              <div class="logo-slot"><span>Collar</span><small data-logo-state="neck"></small><button type="button" class="btn btn-sm" data-logo-up="neck">Upload</button><button type="button" class="link-btn" data-logo-rm="neck">Remove</button></div>
-              <div class="logo-slot"><span>Pants, left leg</span><small data-logo-state="pantsL"></small><button type="button" class="btn btn-sm" data-logo-up="pantsL">Upload</button><button type="button" class="link-btn" data-logo-rm="pantsL">Remove</button></div>
-              <div class="logo-slot"><span>Pants, right leg</span><small data-logo-state="pantsR"></small><button type="button" class="btn btn-sm" data-logo-up="pantsR">Upload</button><button type="button" class="link-btn" data-logo-rm="pantsR">Remove</button></div>
-            </div>
+          <div class="group" data-hide-if="crest.style=none">
+            <div class="range"><label for="crest-scale">Crest size</label><input type="range" id="crest-scale" data-bind="crest.scale" min="0.6" max="1.3" step="0.05" data-unit="%"><output for="crest-scale"></output></div>
           </div>
         </section>
 
-        <!-- (photo logos live in the Crest tab) -->
         <!-- PANTS & SOCKS -->
         <section class="tabpanel" data-panel="kit" role="tabpanel" hidden>
           <div class="group">
@@ -257,7 +284,7 @@
             <h3>Gear</h3>
             <label class="check"><input type="checkbox" id="pants-crest" data-bind="lettering.pantsCrest"> Crest on the pants leg</label>
             <label class="check"><input type="checkbox" id="show-stick" data-bind="lettering.stick"> Show the stick</label>
-            <p class="help">Helmet, gloves, skates and stick colours are in the Colours tab, or click them in the Player view.</p>
+            <p class="help">Helmet, gloves, skates and stick colours are in the Colours tab, or click them on the player.</p>
           </div>
         </section>
       </div>
@@ -276,17 +303,18 @@
   </div>
 </div>
 <input type="file" id="design-file" accept=".json,application/json" hidden>
-<input type="file" id="crest-file" accept="image/*" hidden>
-<input type="file" id="patch-file" accept="image/*" hidden>
-<input type="file" id="photo-logo-file" accept="image/*" hidden>
+<input type="file" id="logo-file" accept="image/*" hidden>
 
 <script src="js/data.js"></script>
 <script src="js/color.js"></script>
 <script src="js/patterns.js"></script>
 <script src="js/render.js"></script>
-<script src="js/realistic.js"></script>
 <script src="js/photo-assets.js"></script>
 <script src="js/photo.js"></script>
+<script src="js/vendor/three.min.js"></script>
+<script src="js/vendor/OrbitControls.js"></script>
+<script src="js/vendor/RoomEnvironment.js"></script>
+<script src="js/model3d.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

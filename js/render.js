@@ -1,5 +1,6 @@
 /* =====================================================================
-   SVG rendering for the jersey (front/back), pants, socks and helmet.
+   Flat SVG jersey, used for the template thumbnails, plus shared helpers
+   (yoke shapes, outlined lettering, crests) used by the other views.
    Every coloured shape carries data-zone="<zone id>" so clicking it in
    the preview opens that zone's colour picker.
    ===================================================================== */
@@ -269,132 +270,7 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 20 400 412" ${opt.attrs || ''}><defs>${defs}</defs>${body}</svg>`;
   }
 
-  /* ---------- pants (breezers) ---------- */
-  function pants(d, kit, opt = {}) {
-    const id = uid(), col = (z) => UB.color(d, kit, z), fill = (z) => `fill="${col(z)}" data-zone="${z}"`;
-    const shape = 'M48 12L252 12L262 48C272 100 282 160 288 212C252 226 202 228 166 220L154 118L146 118L134 220C98 228 48 226 12 212C18 160 28 100 38 48Z';
-    const edgeL = 'M50 -10L38 48C28 100 18 160 12 212L9 250';
-    const edgeR = 'M250 -10L262 48C272 100 282 160 288 212L291 250';
-    const side = (inset, w, z) =>
-      `<path d="${edgeL}" transform="translate(${inset + w / 2} 0)" fill="none" stroke="${col(z)}" stroke-width="${w}" data-zone="${z}"/>` +
-      `<path d="${edgeR}" transform="translate(${-(inset + w / 2)} 0)" fill="none" stroke="${col(z)}" stroke-width="${w}" data-zone="${z}"/>`;
-    let st = '';
-    switch (kit.pants.stripe) {
-      case 'single': st = side(0, 22, 'pantsStripe1'); break;
-      case 'outlined': st = side(0, 32, 'pantsStripe2') + side(5, 22, 'pantsStripe1'); break;
-      case 'twin': st = side(4, 8, 'pantsStripe1') + side(18, 8, 'pantsStripe1'); break;
-      case 'hem': st = `<rect x="0" y="180" width="300" height="5" ${fill('pantsStripe2')}/><rect x="0" y="189" width="300" height="16" ${fill('pantsStripe1')}/>`; break;
-    }
-    let g = `<path d="${shape}" ${fill('pants')}/>${st}`;
-    g += `<rect x="0" y="12" width="300" height="24" fill="#000" fill-opacity=".1" ${NO_HIT}/>`;
-    g += `<path d="M40 36H260M150 36V114" stroke="#000" stroke-opacity=".28" stroke-width="1.2" fill="none" ${NO_HIT}/>`;
-    g += `<path d="M44 30H256" stroke="#fff" stroke-opacity=".25" stroke-width=".8" stroke-dasharray="3 3" ${NO_HIT}/>`;
-    g += `<rect x="0" y="0" width="300" height="240" fill="url(#${id}sh)" ${NO_HIT}/>`;
-    const defs = `<clipPath id="${id}c"><path d="${shape}"/></clipPath>` +
-      `<linearGradient id="${id}sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".2"/><stop offset=".25" stop-color="#000" stop-opacity="0"/><stop offset=".5" stop-color="#000" stop-opacity=".12"/><stop offset=".75" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient>` +
-      `<filter id="${id}f" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="${OUTLINE}" flood-opacity=".2"/></filter>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 0 312 246" ${opt.attrs || ''}><defs>${defs}</defs>` +
-      `<g filter="url(#${id}f)"><g clip-path="url(#${id}c)">${g}</g>` +
-      `<path d="${shape}" fill="none" stroke="${OUTLINE}" stroke-opacity=".55" stroke-width="1.3" stroke-linejoin="round" ${NO_HIT}/></g></svg>`;
-  }
-
-  /* ---------- socks ---------- */
-  function socks(d, kit, opt = {}) {
-    const id = uid(), col = (z) => UB.color(d, kit, z), fill = (z) => `fill="${col(z)}" data-zone="${z}"`;
-    const shape = 'M6 10L104 10L97 300Q55 318 13 300Z';
-    const sk = kit.socks, style = sk.style === 'match' ? kit.jersey.hem.style : sk.style;
-    let bands = '';
-    for (const b of stripeSet(style)) {
-      const bottom = 250 - sk.offset - b.at * sk.size, h = b.h * sk.size;
-      bands += `<rect x="-10" y="${R(bottom - h)}" width="130" height="${R(h)}" fill="${col(b.c === 1 ? 'sockStripe1' : 'sockStripe2')}" data-zone="${b.c === 1 ? 'sockStripe1' : 'sockStripe2'}"/>`;
-    }
-    const one = (x) => `<g transform="translate(${x} 0)"><g clip-path="url(#${id}c)">` +
-      `<path d="${shape}" ${fill('socks')}/>${bands}` +
-      `<path d="M8 24H102" stroke="#000" stroke-opacity=".2" stroke-width="1.2" ${NO_HIT}/>` +
-      `<rect x="0" y="0" width="110" height="320" fill="url(#${id}sh)" ${NO_HIT}/></g>` +
-      `<path d="${shape}" fill="none" stroke="${OUTLINE}" stroke-opacity=".55" stroke-width="1.3" stroke-linejoin="round" ${NO_HIT}/></g>`;
-    const defs = `<clipPath id="${id}c"><path d="${shape}"/></clipPath>` +
-      `<linearGradient id="${id}sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".45" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>` +
-      `<filter id="${id}f" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="${OUTLINE}" flood-opacity=".2"/></filter>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 330" ${opt.attrs || ''}><defs>${defs}</defs><g filter="url(#${id}f)">${one(12)}${one(128)}</g></svg>`;
-  }
-
-  /* ---------- helmet (side view, facing right) ---------- */
-  function helmet(d, kit, opt = {}) {
-    const id = uid(), col = (z) => UB.color(d, kit, z), fill = (z) => `fill="${col(z)}" data-zone="${z}"`;
-    const shell = 'M34 128C26 72 72 24 138 24C196 24 230 62 226 104L224 116L160 118C150 98 112 98 104 120L104 138L44 140C38 138 35 134 34 128Z';
-    const ear = 'M108 120C112 100 154 100 158 120L160 146C144 158 122 158 108 146Z';
-    const f = font(d.lettering.numberFont), num = d.player.number || '';
-    let g = `<path d="${shell}" ${fill('helmet')}/>`;
-    g += `<ellipse cx="122" cy="50" rx="56" ry="15" fill="#fff" fill-opacity=".22" transform="rotate(-6 122 50)" ${NO_HIT}/>`;
-    g += [[116, 34, -6], [152, 33, 6], [186, 44, 24], [70, 58, -42]].map(([x, y, a]) =>
-      `<rect x="${x - 13}" y="${y - 4}" width="26" height="8" rx="4" fill="#000" fill-opacity=".45" transform="rotate(${a} ${x} ${y})" ${NO_HIT}/>`).join('');
-    g += `<path d="M38 126L102 124M162 112L222 108" stroke="#000" stroke-opacity=".25" stroke-width="1.2" fill="none" ${NO_HIT}/>`;
-    if (d.lettering.helmetNumber && num) {
-      g += `<text x="66" y="${R(112)}" font-family="${f.family}" font-weight="${f.weight}" font-size="${R(26 * f.size)}" text-anchor="middle" fill="${col('helmetDecal')}" data-zone="helmetDecal">${esc(num)}</text>`;
-    }
-    const defs = `<filter id="${id}f" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="${OUTLINE}" flood-opacity=".2"/></filter>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 230 180" ${opt.attrs || ''}><defs>${defs}</defs><g filter="url(#${id}f)">` +
-      g + `<path d="${shell}" fill="none" stroke="${OUTLINE}" stroke-opacity=".55" stroke-width="1.3" stroke-linejoin="round" ${NO_HIT}/>` +
-      `<path d="M150 150C160 168 178 174 198 166" fill="none" stroke="${col('helmetTrim')}" stroke-width="5" stroke-linecap="round" data-zone="helmetTrim"/>` +
-      `<path d="${ear}" ${fill('helmetTrim')} stroke="${OUTLINE}" stroke-opacity=".5" stroke-width="1.1"/>` +
-      [124, 134, 144].map((x) => `<circle cx="${x}" cy="130" r="2.6" fill="#000" fill-opacity=".45" ${NO_HIT}/>`).join('') +
-      `</g></svg>`;
-  }
-
-  /* ---------- export sheets ---------- */
-  const SHEET_BG = '#EEF3F6', SHEET_INK = '#0E1A26', SHEET_MUTED = '#5A6B7B';
-  const TITLE_FONT = "'Saira Condensed', 'Arial Narrow', sans-serif";
-
-  function swatchRow(d, x, y) {
-    return d.team.palette.map((c, i) => {
-      const cx = x + i * 118;
-      return `<rect x="${cx}" y="${y}" width="26" height="26" rx="4" fill="${c}" stroke="${SHEET_INK}" stroke-opacity=".25"/>` +
-        `<text x="${cx + 34}" y="${y + 11}" font-family="${TITLE_FONT}" font-size="12" font-weight="600" letter-spacing="1" fill="${SHEET_MUTED}">${UB.PALETTE_SLOTS[i].toUpperCase()}</text>` +
-        `<text x="${cx + 34}" y="${y + 26}" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="${SHEET_INK}">${c.toUpperCase()}</text>`;
-    }).join('');
-  }
-
-  /* One kit: front, back, helmet, pants and socks. */
-  function sheet(d, kitKey, css = '') {
-    const kit = d.kits[kitKey], W = 1400, H = 1180;
-    const label = `${UB.KIT_NAMES[kitKey]} uniform · ${kit.swap ? 'light' : 'dark'} sweater`.toUpperCase();
-    const tpl = UB.TEMPLATES.find((t) => t.id === kit.template);
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
-      (css ? `<style>${css}</style>` : '') +
-      `<rect width="${W}" height="${H}" fill="${SHEET_BG}"/>` +
-      `<rect x="${W / 2 - 3}" y="120" width="6" height="660" fill="#D2232A" fill-opacity=".14"/>` +
-      `<text x="60" y="78" font-family="${TITLE_FONT}" font-size="52" font-weight="800" fill="${SHEET_INK}">${esc((d.team.name || 'My team').toUpperCase())}</text>` +
-      `<text x="62" y="106" font-family="${TITLE_FONT}" font-size="18" font-weight="600" letter-spacing="2" fill="${SHEET_MUTED}">${esc(label)}${tpl ? ' · ' + esc(tpl.name.toUpperCase()) : ''}</text>` +
-      `<g transform="translate(${W - 60 - 118 * 5 + 30} 66)">${swatchRow(d, 0, 0)}</g>` +
-      jersey(d, kit, 'front', { attrs: `x="50" y="130" width="630" height="649"` }) +
-      jersey(d, kit, 'back', { attrs: `x="720" y="130" width="630" height="649"` }) +
-      helmet(d, kit, { attrs: `x="90" y="830" width="330" height="258"` }) +
-      pants(d, kit, { attrs: `x="500" y="820" width="380" height="300"` }) +
-      socks(d, kit, { attrs: `x="980" y="810" width="300" height="340"` }) +
-      `</svg>`;
-  }
-
-  /* All three kits side by side, front and back. */
-  function lineup(d, css = '') {
-    const W = 1500, H = 1060, keys = ['home', 'away', 'third'];
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
-      (css ? `<style>${css}</style>` : '') +
-      `<rect width="${W}" height="${H}" fill="${SHEET_BG}"/>` +
-      `<text x="60" y="78" font-family="${TITLE_FONT}" font-size="52" font-weight="800" fill="${SHEET_INK}">${esc((d.team.name || 'My team').toUpperCase())}</text>` +
-      `<text x="62" y="106" font-family="${TITLE_FONT}" font-size="18" font-weight="600" letter-spacing="2" fill="${SHEET_MUTED}">UNIFORM SET · HOME, AWAY AND THIRD</text>` +
-      `<g transform="translate(${W - 60 - 118 * 5 + 30} 66)">${swatchRow(d, 0, 0)}</g>`;
-    keys.forEach((k, i) => {
-      const x = 60 + i * 470;
-      s += `<text x="${x + 215}" y="170" text-anchor="middle" font-family="${TITLE_FONT}" font-size="22" font-weight="700" letter-spacing="3" fill="${SHEET_INK}">${UB.KIT_NAMES[k].toUpperCase()}</text>`;
-      s += jersey(d, d.kits[k], 'front', { attrs: `x="${x}" y="190" width="430" height="443"` });
-      s += jersey(d, d.kits[k], 'back', { attrs: `x="${x + 60}" y="610" width="310" height="320"` });
-      s += socks(d, d.kits[k], { attrs: `x="${x + 160}" y="935" width="110" height="110"` });
-    });
-    return s + `</svg>`;
-  }
-
-  UB.render = { jersey, pants, socks, helmet, sheet, lineup, crest };
+  UB.render = { jersey, crest };
   /* Shared helpers for the realistic renderer. */
   UB.render._ = { uid, R, esc, P, outlinedText, crest, font, stripeSet, yokePath, numberCols, shieldPath };
 })();
