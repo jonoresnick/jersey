@@ -162,6 +162,29 @@ grain = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.
 D_f = np.where(fill, D_f + grain, D_f)
 D = np.where(fabric, D_f, D)
 
+# The fill is smooth, so the crest and number areas lose their folds. Carry the fold
+# detail (a high-pass of the real shading) into each hole from the fabric directly
+# above and below it, the way folds run on a hanging jersey, then soften it.
+detail = np.zeros((H, W), np.float32)
+hp = (D - cv2.GaussianBlur(D, (0, 0), 5)) * known
+for x in range(W):
+    col = fill[:, x]
+    if not col.any():
+        continue
+    ys = np.where(known[:, x])[0]
+    if len(ys) == 0:
+        continue
+    hy = np.where(col)[0]
+    j = np.clip(np.searchsorted(ys, hy), 0, len(ys) - 1)
+    above = ys[np.clip(j - 1, 0, len(ys) - 1)]
+    below = ys[j]
+    near = np.where(np.abs(hy - above) < np.abs(below - hy), above, below)
+    detail[hy, x] = hp[near, x]
+detail = cv2.GaussianBlur(detail, (0, 0), sigmaX=1.2, sigmaY=7)
+# Fade the borrowed folds in from the hole's edge so nothing looks pasted.
+fade = np.clip(cv2.distanceTransform(fill.astype(np.uint8), cv2.DIST_L2, 5) / 10, 0, 1)
+D = np.where(fill, np.clip(D + detail * 1.6 * fade, 0, 1), D)
+
 
 # Dark gear (pants, glove backs, helmet): diffuse shading from the outline,
 # the photo's highlights kept as sheen.

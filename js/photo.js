@@ -247,6 +247,34 @@
     ctx.restore();
   }
 
+  /* ---------- print layer helpers ---------- */
+  function alphaOf(px) {
+    const n = px.length / 4, a = new Float32Array(n);
+    for (let i = 0; i < n; i++) a[i] = px[i * 4 + 3] / 255;
+    return a;
+  }
+  // Two-pass box blur (horizontal, then vertical) of radius r.
+  function boxBlur(src, w, h, r) {
+    const tmp = new Float32Array(src.length), out = new Float32Array(src.length), k = 1 / (2 * r + 1);
+    for (let y = 0; y < h; y++) {
+      let acc = 0, o = y * w;
+      for (let x = -r; x <= r; x++) acc += src[o + Math.min(w - 1, Math.max(0, x))];
+      for (let x = 0; x < w; x++) {
+        tmp[o + x] = acc * k;
+        acc += src[o + Math.min(w - 1, x + r + 1)] - src[o + Math.max(0, x - r)];
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let y = -r; y <= r; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+      for (let y = 0; y < h; y++) {
+        out[y * w + x] = acc * k;
+        acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+      }
+    }
+    return out;
+  }
+
   /* ---------- assets ---------- */
   let assets = null;
   async function loadAssets() {
@@ -282,7 +310,13 @@
     atlas.width = W; atlas.height = H * N_LAYERS;
     const ax = atlas.getContext('2d');
     if (art) ax.drawImage(art, 0, 0);
-    await drawLetters(ax, d, kit);
+    // Letters and logos go on their own layer first, so they can get a stitched edge.
+    const prints = document.createElement('canvas');
+    prints.width = W; prints.height = H * N_LAYERS;
+    await drawLetters(prints.getContext('2d'), d, kit);
+    ax.drawImage(prints, 0, 0);
+    const pa = alphaOf(prints.getContext('2d').getImageData(0, 0, W, H * N_LAYERS).data);
+    const pb = boxBlur(pa, W, H * N_LAYERS, 1);
     if (my !== seq) return false;
     const ad = ax.getImageData(0, 0, W, H * N_LAYERS).data;
 
@@ -302,7 +336,22 @@
       const ly = layerOf[l];
       if (ly !== null) { const q = p + ly * stride; r = ad[q]; g = ad[q + 1]; b = ad[q + 2]; }
       else { const s = solidOf[l]; r = s[0]; g = s[1]; b = s[2]; }
-      const D = a.dif[i], S = a.shn[i] * 255;
+      let D = a.dif[i], S = a.shn[i] * 255;
+      if (ly !== null) {
+        // Raised twill: a lit top-left edge, a shaded bottom-right edge, a soft
+        // shadow cast onto the fabric, and the knit showing through the print.
+        const q = i + ly * n, x = i % W, y = (i - x) / W;
+        const al = pa[q];
+        if (al > 0 || pb[q] > 0) {
+          const up = y > 1 && x > 1 ? pb[q - 2 * W - 2] : 0, dn = y < H - 2 && x < W - 2 ? pb[q + 2 * W + 2] : 0;
+          const edge = dn - up;                       // > 0 on edges facing the light
+          D *= 1 + al * (0.3 * edge) - (1 - al) * 0.24 * Math.max(0, up - al);
+          if (al > 0) {
+            D *= 1 + al * (((x + y) & 1 ? 0.025 : -0.025) + ((x * 7 + y * 3) % 5 === 0 ? -0.03 : 0));
+            S += al * Math.max(0, edge) * 18;         // a little satin catch-light on the twill
+          }
+        }
+      }
       r = r * D + S; g = g * D + S; b = b * D + S;
       if (k < 1) { const j = 1 - k; r = r * k + base[p] * j; g = g * k + base[p + 1] * j; b = b * k + base[p + 2] * j; }
       o[p] = r; o[p + 1] = g; o[p + 2] = b;
