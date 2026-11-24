@@ -15,7 +15,6 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const STORE_KEY = 'digital-jersey:design:v1';
-  const SAVED_KEY = 'digital-jersey:saved:v1';
 
   const AI_ENDPOINT = '/api/ai-effect';   // Netlify function that asks Claude (see netlify/functions/ai-effect.mjs)
   let state, history = [], future = [], side = 'front';
@@ -91,6 +90,7 @@
     future = [];
     store.write(STORE_KEY, state);
     syncUndo();
+    document.dispatchEvent(new Event('dj:design'));
   }
   function restore(s) {
     const active = state.active;
@@ -407,16 +407,6 @@
 
   /* ---------------- save, download ---------------- */
   const slug = () => (state.team.name || 'jersey').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'jersey';
-  function saveDesign() {
-    const c = document.createElement('canvas');
-    paintPhoto(state, kit(), c, 360).then(() => {
-      const list = store.read(SAVED_KEY) || [];
-      const tpl = UB.TEMPLATES.find((t) => t.id === kit().template);
-      list.unshift({ id: Date.now().toString(36), title: state.team.name || 'My jersey', sub: `${tpl ? tpl.name : ''} · ${UB.KIT_NAMES[state.active]}`, thumb: c.toDataURL('image/jpeg', 0.82), design: state });
-      if (store.write(SAVED_KEY, list.slice(0, 12))) toast('Saved. Find it under Explore.');
-      else toast('This browser has no room to save. Remove a design or a large logo.');
-    });
-  }
   async function exportPng(all) {
     const keys = all ? Object.keys(UB.KIT_NAMES) : [state.active];
     openModal('Your design', '<p class="hint">Drawing the image…</p>');
@@ -436,7 +426,8 @@
   }
 
   /* ---------------- modal and toast ---------------- */
-  function openModal(title, body, actions = []) {
+  function openModal(title, body, actions = [], opts = {}) {
+    $('.modal-card', $('#modal')).classList.toggle('wide', !!opts.wide);
     $('#modalTitle').textContent = title;
     $('#modalBody').innerHTML = body;
     const foot = $('#modalActions');
@@ -467,11 +458,6 @@
   let filter = 'all', exploreSeq = 0;
 
   function renderExplore() {
-    const saved = store.read(SAVED_KEY) || [];
-    $('#savedBlock').hidden = !saved.length;
-    $('#savedCards').innerHTML = saved.map((s) =>
-      `<div class="card" data-saved="${s.id}"><button class="card-img" type="button" data-open-saved="${s.id}" aria-label="Open ${esc(s.title)}"><img src="${s.thumb}" alt=""></button>` +
-      `<div><strong>${esc(s.title)}</strong><span>${esc(s.sub)}</span></div><div class="card-actions"><button class="link" type="button" data-open-saved="${s.id}">Open</button><button class="link" type="button" data-del-saved="${s.id}">Delete</button></div></div>`).join('');
     const shown = STARTERS.map((s, i) => ({ ...s, i })).filter((s) => filter === 'all' || (filter === 'light') === s.light);
     $('#starterCards').innerHTML = shown.map((s) => {
       const t = UB.TEMPLATES.find((x) => x.id === s.template);
@@ -510,19 +496,21 @@
   /* ---------------- routing ---------------- */
   let route = 'home';
   function go() {
-    const r = (location.hash || '#home').slice(1);
-    route = ['home', 'design', 'explore'].includes(r) ? r : 'home';
-    $$('.page').forEach((p) => { p.hidden = p.dataset.page !== route; });
+    const [r, ...rest] = (location.hash || '#home').slice(1).split('/'), param = rest.join('/');
+    route = ['home', 'design', 'explore', 'signin', 'signup', 'library', 'team', 'account', 'view'].includes(r) ? r : 'home';
+    const pageKey = route === 'signin' || route === 'signup' ? 'auth' : route;
+    $$('.page').forEach((p) => { p.hidden = p.dataset.page !== pageKey; });
     $$('[data-nav]').forEach((a) => (a.dataset.nav === route ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
     closePicker();
     document.body.dataset.route = route;
     window.scrollTo(0, 0);
-    document.title = { home: 'Digital Jersey', design: 'Design · Digital Jersey', explore: 'Explore · Digital Jersey' }[route];
+    document.title = { home: 'Digital Jersey', design: 'Design · Digital Jersey', explore: 'Explore · Digital Jersey', signin: 'Log in · Digital Jersey', signup: 'Sign up · Digital Jersey', library: 'Library · Digital Jersey', team: 'Team · Digital Jersey', account: 'Account · Digital Jersey', view: 'Jersey reveal' }[route];
     if (route === 'home') renderHome();
     if (route === 'explore') renderExplore();
     syncControls();
     render();
     showTab(activeTab);
+    if (UB.saas) UB.saas.route(route, param);
   }
 
   /* ---------------- events ---------------- */
@@ -592,15 +580,6 @@
       if (filt) { filter = filt.dataset.filter; $$('[data-filter]').forEach((b) => b.setAttribute('aria-checked', String(b === filt))); renderExplore(); return; }
       const starter = t.closest('[data-starter]');
       if (starter) { loadStarter(STARTERS[+starter.dataset.starter]); return; }
-      const open = t.closest('[data-open-saved]');
-      if (open) {
-        const s = (store.read(SAVED_KEY) || []).find((x) => x.id === open.dataset.openSaved);
-        if (s) { state = normalize(s.design); commit(); location.hash = '#design'; }
-        return;
-      }
-      const del = t.closest('[data-del-saved]');
-      if (del) { store.write(SAVED_KEY, (store.read(SAVED_KEY) || []).filter((x) => x.id !== del.dataset.delSaved)); renderExplore(); return; }
-
       // colour each part / click the preview
       const row = t.closest('.zone-row');
       if (row) { const r = row.getBoundingClientRect(); openPicker(row.dataset.zone, { x: r.left + r.width / 2, y: r.bottom - 8 }); return; }
@@ -622,7 +601,6 @@
       if (box && t.closest('[data-rm]')) { SLOTS[box.dataset.drop].set(null); syncControls(); render(); commit(); return; }
       if (box && t.closest('[data-pick]')) { pickSlot = box.dataset.drop; $('#logoFile').click(); return; }
 
-      if (t.closest('#saveBtn')) saveDesign();
       if (t.closest('#downloadBtn')) exportPng(false);
       if (t.closest('#downloadAllBtn')) exportPng(true);
       if (t.closest('#resetBtn')) openModal('Start over?', '<p class="hint">This replaces your design with the example. You can undo it.</p>', [{ label: 'Start over', primary: true, run: () => { state = sampleDesign(); commit(); syncAll(); } }]);
@@ -751,6 +729,29 @@
   }
 
   /* ---------------- boot ---------------- */
+  /* What the account, library and sharing pages use. */
+  UB.app = {
+    get design() { return state; },
+    kit: () => kit(),
+    paint: paintPhoto,
+    normalize: (d) => normalize(d),
+    setDesign(d) { state = normalize(d); commit(); syncAll(); },
+    newDesign(brand) {
+      const d = sampleDesign();
+      if (brand) {
+        if (brand.palette && brand.palette.length === 5) d.team.palette = brand.palette.slice();
+        if (brand.teamName) d.team.name = brand.teamName;
+        if (brand.crest) { d.crest.image = brand.crest; d.crest.style = 'image'; }
+        if (brand.sponsor) d.photoLogos = { ...(d.photoLogos || {}), sponsor: brand.sponsor };
+      }
+      state = d; commit(); syncAll();
+    },
+    toast: (m) => toast(m), openModal: (...a) => openModal(...a), closeModal: () => closeModal(), esc, slug: () => slug(),
+    go: (hash) => { location.hash = hash; },
+    exportPng: (all) => exportPng(all),
+    reset: () => { state = sampleDesign(); commit(); syncAll(); },
+  };
+
   function boot() {
     state = normalize(store.read(STORE_KEY));
     buildPills();
@@ -759,6 +760,7 @@
     wire();
     wireGestures();
     commit();
+    if (UB.saas) UB.saas.init();
     go();
     if (document.fonts) document.fonts.ready.then(render);
   }

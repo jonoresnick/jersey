@@ -17,7 +17,9 @@
       <nav class="nav" aria-label="Main">
         <a href="#design" data-nav="design">Design</a>
         <a href="#explore" data-nav="explore">Explore</a>
+        <a href="#library" data-nav="library" id="navLibrary" hidden>Library</a>
       </nav>
+      <div class="auth-slot" id="authSlot"></div>
     </div>
   </header>
 
@@ -115,6 +117,7 @@
             <button type="button" role="tab" data-tabbtn="text" aria-selected="false">Text and logos</button>
             <button type="button" role="tab" data-tabbtn="kit" aria-selected="false">Pants and socks</button>
             <button type="button" role="tab" data-tabbtn="parts" aria-selected="false">Each part</button>
+            <button type="button" role="tab" data-tabbtn="share" aria-selected="false">Save and share</button>
           </div>
         </div>
 
@@ -241,11 +244,18 @@
             <div id="zones"></div>
           </details>
 
-          <div class="actions">
-            <button class="btn ghost" id="saveBtn" type="button">Save design</button>
-            <button class="btn primary" id="downloadBtn" type="button">Download PNG</button>
+          <div class="opt" data-tab="share" id="shareOpt">
+            <h2 class="opt-title">Save and share</h2>
+            <label class="field"><span>Design name</span><input class="text-input wide" id="projName" type="text" maxlength="60" placeholder="Untitled design" autocomplete="off"></label>
+            <p class="hint" id="saveStatus">Not saved yet.</p>
+            <div class="share-actions">
+              <button class="btn primary" id="saveBtn" type="button">Save to library</button>
+              <button class="btn" id="shareBtn" type="button">Share link</button>
+              <button class="btn" id="socialBtn" type="button">Social post</button>
+              <button class="btn" id="downloadBtn" type="button">Download PNG</button>
+            </div>
+            <p class="hint actions-note"><button class="link" id="downloadAllBtn" type="button">Download all three kits</button> · <button class="link" id="resetBtn" type="button">Start over</button></p>
           </div>
-          <p class="hint actions-note"><button class="link" id="downloadAllBtn" type="button">Download all three kits</button> · <button class="link" id="resetBtn" type="button">Start over</button></p>
         </div>
       </div>
     </section>
@@ -255,10 +265,6 @@
       <div class="container">
         <h1 class="step-title wide" id="exploreTitle" tabindex="-1">Explore designs</h1>
         <p class="lede narrow">Starting points in twelve colour schemes. Click one to load it into the designer. Your name, number and logos come with you.</p>
-        <div class="saved" id="savedBlock" hidden>
-          <h2 class="section-title">Your saved designs</h2>
-          <div class="cards" id="savedCards"></div>
-        </div>
         <div class="filters" role="radiogroup" aria-label="Filter">
           <button class="pill" type="button" role="radio" data-filter="all" aria-checked="true">All</button>
           <button class="pill" type="button" role="radio" data-filter="light" aria-checked="false">Light jerseys</button>
@@ -267,9 +273,16 @@
         <div class="cards" id="starterCards"></div>
       </div>
     </section>
+
+    <!-- Account pages (filled in by js/saas.js) -->
+    <section class="page auth" data-page="auth" aria-labelledby="authTitle" hidden><div class="container narrow-page" id="authBox"></div></section>
+    <section class="page library" data-page="library" aria-labelledby="libTitle" hidden><div class="container" id="libraryBox"></div></section>
+    <section class="page team" data-page="team" aria-labelledby="teamTitle" hidden><div class="container" id="teamBox"></div></section>
+    <section class="page account" data-page="account" aria-labelledby="accTitle" hidden><div class="container narrow-page" id="accountBox"></div></section>
+    <section class="page view" data-page="view" aria-labelledby="viewTitle" hidden><div class="container" id="viewBox"></div></section>
   </main>
 
-  <footer class="site-footer"><div class="container"><span>Digital Jersey</span><span>Designs are saved in this browser.</span></div></footer>
+  <footer class="site-footer"><div class="container"><span>Digital Jersey</span><span>Demo mode: accounts and designs are saved in this browser.</span></div></footer>
 
   <div id="popover" class="popover" role="dialog" aria-label="Choose colour" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
@@ -308,6 +321,10 @@
   <script src="js/photo-assets.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/photo.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/share.js"></script>
+  <script src="js/social.js"></script>
+  <script src="js/saas.js"></script>
   <script src="js/site.js"></script>
 </body>
 </html>
