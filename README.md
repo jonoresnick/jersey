@@ -1,52 +1,36 @@
-# Hockey Uniform Builder
+# Digital Jersey
 
-Design a full hockey uniform in the browser and see it rendered like a product mock-up: a hanging jersey with folds, fabric texture, stitching and raised twill lettering, plus a full player with helmet and visor, gloves, pants, socks, skates and stick.
-Pick a template, set your team colours, then change any stripe, pattern, collar, crest, name or number.
-Everything runs locally; nothing is uploaded.
+Design a hockey jersey and see it on a player. Built to look and work like Digital Stick: one page, hash routes, no build step.
+
+| Route | Page |
+| --- | --- |
+| `#home` | Hero, how it works, the twelve templates |
+| `#design` | The designer: kit, template, team colours, stripes, pattern, collar, name and number, logos, pants and socks |
+| `#explore` | Twelve starter designs in different colour schemes, plus your saved designs |
 
 ## Run it
 
-Open `index.html` in a browser. That's it, no install or build step.
-
-To host it as one file (GitHub Pages, email, a shared drive):
-
-```bash
-node scripts/build-single.mjs
+```sh
+python3 -m http.server 8000
+# open http://localhost:8000
 ```
 
-This writes `dist/hockey-uniform-builder.html` with all CSS and JS inlined.
+`node scripts/build-single.mjs` writes `dist/hockey-uniform-builder.html`, one file with everything inlined.
 
-## Using it
+## Files
 
-- **Views**: *Photo* repaints a real mannequin photo with your design, keeping the photo's folds and gloss. *3D* is a player you can drag around to see from any angle, including the name and number on the back.
-- **Home / Away / Third**: three kits share one team palette, crest, player name and number. Each kit has its own style and colour mapping.
-- **Template**: 12 starting points (Original Six, Heritage Yoke, Chevron, Arena Fade, Camo Night, and more). Applying one keeps your team colours, lettering and crest. *Light (away)* swaps Primary and Secondary to make a white road sweater.
-- **Colours**: five team colours plus 12 ready-made schemes. Every part of the uniform (body, sleeves, yoke, each stripe, pattern, collar, laces, number and outlines, name, crest, pants, socks, helmet) links to a team colour or a fixed custom colour. Change a team colour and every linked part updates on all kits.
-- **Click anything in the preview** to recolour it directly.
-- **Stripes & patterns**: collar style, shoulder yoke (shape, depth, trim), hem and sleeve stripes (style, height, size), and 12 patterns with size, position, strength and coverage.
-- **Name & number**: 8 number fonts, single or double outline, arched name, sleeve and helmet numbers, captain's C or A. A contrast check warns when the number is hard to read against the body.
-- **Logos**: upload boxes (drop an image or click) for the chest crest, a sponsor (top right of the chest), the captaincy patch (top left, or a C or A letter), shoulder patches, the collar and each pants leg. Without a crest image you can use a text crest.
-- **Pants & gear**: pants stripes, sock stripes, crest on the pants leg, and the stick. Helmet, gloves, skates and stick each have their own colours.
-- **Export & save**: PNG of one kit or all three (from the Photo or 3D view), save/open a design file, or copy/paste design code. Undo and redo with Ctrl+Z / Ctrl+Shift+Z. Your work autosaves in the browser.
+- `index.html`: markup for every page
+- `css/site.css`: layout and styles (same tokens as Digital Stick)
+- `js/site.js`: routing, design state, controls, saving and export
+- `js/data.js`: templates, colour schemes, stripe sets, fonts, colour zones, the example team
+- `js/patterns.js`: jersey patterns
+- `js/photo.js`, `js/photo-assets.js`: repaint the mannequin photo with the design
+- `js/render.js`: flat jersey drawing (template thumbnails and the back view)
+- `scripts/photo-template/`: builds the photo template from a mock-up image
+- `labs/`: the earlier studio-style UI and an experimental 3D player (not used by the site)
 
-## Editing the builder
+## Editing
 
-All options are plain data in **`js/data.js`**, so most changes don't touch any logic:
+Almost everything is plain data in `js/data.js`: add a template, scheme, stripe set or font there. Add a pattern in `js/patterns.js`. Colour values are a palette slot (`"p0"` to `"p4"`) or a fixed hex.
 
-| To add or change… | Edit |
-|---|---|
-| A colour scheme | `UB.SCHEMES` |
-| A template | `UB.TEMPLATES` (style settings plus which palette slot goes where) |
-| A stripe layout | `UB.STRIPE_SETS` (bands with position, thickness and colour) |
-| A number font | `UB.FONTS` (any Google Font; also add it to the font link in `index.html`) |
-| The example team | `UB.SAMPLE` |
-
-Colour values are either a palette slot (`"p0"` Primary … `"p4"` Extra) or a fixed hex like `"#56623B"`.
-
-New patterns go in **`js/patterns.js`**: each is a small function that returns SVG in jersey coordinates.
-Controls, state and export are in `js/app.js`.
-
-### How the Photo view works
-
-`js/photo-assets.js` holds the mannequin photo plus a map of which part each pixel belongs to and how lit it is. `js/photo.js` draws your design flat for each part, then multiplies it by that lighting, so any colour or stripe gets the photo's real folds. Positions of stripes, crest and numbers on the photo are in `GEO` at the top of `js/photo.js`. The template is built by the scripts in `scripts/photo-template/` (see its README).
-
+Designs and saved designs live in the visitor's browser (`localStorage`).
