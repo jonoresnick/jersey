@@ -24,6 +24,9 @@ python3 -m http.server 8000
 - `js/site.js`: routing, design state, controls, saving and export
 - `js/data.js`: templates, colour schemes, stripe sets, fonts, colour zones, the example team
 - `js/patterns.js`: jersey patterns
+- `js/effects.js`: stripe effects (patterns on stripes, deboss and emboss) and the built-in helper
+- `js/cutout.js`: logo background removal
+- `netlify/functions/ai-effect.mjs`: the AI helper's server side
 - `js/photo.js`, `js/photo-assets.js`: repaint the mannequin photo with the design
 - `js/render.js`: flat jersey drawing (template thumbnails and the back view)
 - `scripts/photo-template/`: builds the photo template from a mock-up image
@@ -39,6 +42,24 @@ Poses are a list, `UB.POSES`, in `js/photo.js`. Only one is defined today, so th
 - `geo`: where stripes, crest, numbers and logos sit on that photo, in the same shape as `GEO` at the top of `js/photo.js`.
 
 Load the new file in `index.html` before `js/photo.js` and push the pose onto `UB.POSES`. A Pose row of buttons then appears under Scene.
+
+## AI help
+
+**Stripe effects** (Design, Stripe effects). Pick a stripe, then describe what you want, such as "debossed stars on the main stripe" or "raised gold diagonal lines on the sock stripe", and press Ask AI. The result fills the same controls you can use by hand (pattern, finish, size, spacing, angle, colour), so it is always editable. Effects are plain data in `js/effects.js`; a new pattern is one shape there.
+
+The page sends the sentence to `/api/ai-effect` (`netlify/functions/ai-effect.mjs`), which asks Claude for settings in a fixed format. The browser checks the answer again, so a bad reply can't break the page. If the service isn't connected, or fails, a built-in helper reads common words ("stars", "deboss", "gold", "diagonal") so the feature still works.
+
+To turn the AI on:
+
+1. Deploy to Netlify (no build command; it reads `netlify.toml` and `package.json`).
+2. In Netlify, add the environment variable `ANTHROPIC_API_KEY`.
+3. In the Anthropic console, set a monthly spend limit. The function also limits each visitor to 12 requests a minute, but that limit resets when the function restarts, so the spend limit is the real safeguard.
+
+**Logo cut-out.** When someone uploads a logo with a plain background (a JPG, say), a dialog offers to remove it and shows the result on a checkerboard. It finds the background colour from the image edge and removes matching areas connected to the edge, so white inside the logo stays. Sliders set how much to remove and how soft the edge is, and "Pick background colour" lets you click the background. It runs in the browser and works best on a plain background. Photos with busy backgrounds need a dedicated background remover first.
+
+## Phones
+
+On a narrow screen the header shrinks while designing, the preview stays pinned at the top, and the options are swipeable tabs (Style, Stripes, Text and logos, Pants and socks, Each part). Pinch to zoom the preview, drag to pan, double-tap to zoom, and swipe sideways to flip between front and back.
 
 ## Editing
 

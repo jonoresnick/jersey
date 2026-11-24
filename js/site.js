@@ -17,7 +17,9 @@
   const STORE_KEY = 'digital-jersey:design:v1';
   const SAVED_KEY = 'digital-jersey:saved:v1';
 
+  const AI_ENDPOINT = '/api/ai-effect';   // Netlify function that asks Claude (see netlify/functions/ai-effect.mjs)
   let state, history = [], future = [], side = 'front';
+  let fxTarget = 'stripe1', activeTab = 'style';
 
   /* ---------------- design model ---------------- */
   function deepMerge(base, over) {
@@ -137,6 +139,7 @@
       $('#previewHint').textContent = back ? 'The back is a flat drawing. Click any part to change its colour.' : 'Click any part to change its colour.';
       $$('#sidePills .pill').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.side === side)));
       renderKitPills();
+      renderFx();
       renderTemplates();
       renderTeamColours();
       renderZones();
@@ -202,6 +205,115 @@
       return `<button class="tpl" type="button" role="radio" data-tpl="${t.id}" aria-checked="${k.template === t.id}" aria-label="${esc(t.name)}">` +
         `${UB.render.jersey(state, preview, 'front', { thumb: true, attrs: 'aria-hidden="true"' })}${esc(t.name)}</button>`;
     }).join('');
+  }
+
+  /* ---------------- stripe effects ---------------- */
+  function fxShown(zone) {
+    const k = kit(), j = k.jersey, has = (style, c) => (UB.STRIPE_SETS[style] || UB.STRIPE_SETS.none).bands.some((b) => b.c === c);
+    const sock = k.socks.style === 'match' ? j.hem.style : k.socks.style;
+    switch (zone) {
+      case 'stripe1': return has(j.hem.style, 1) || has(j.sleeve.style, 1);
+      case 'stripe2': return has(j.hem.style, 2) || has(j.sleeve.style, 2);
+      case 'pantsStripe1': return k.pants.stripe !== 'none';
+      case 'pantsStripe2': return ['outlined', 'hem'].includes(k.pants.stripe);
+      case 'sockStripe1': return has(sock, 1);
+      default: return has(sock, 2);
+    }
+  }
+  function renderFx() {
+    const fx = kit().fx || {};
+    $('#fxTargets').innerHTML = Object.entries(UB.FX.TARGETS).map(([k, l]) =>
+      `<button class="pill" type="button" role="radio" data-fx-target="${k}" aria-checked="${k === fxTarget}">${esc(l)}${fx[k] ? ' ·' : ''}</button>`).join('');
+    const e = fx[fxTarget];
+    const pills = (key, map, cur) => `<div class="pills" role="radiogroup">${Object.entries(map).map(([v, l]) =>
+      `<button class="pill" type="button" role="radio" data-fx-key="${key}" data-val="${v}" aria-checked="${v === cur}">${esc(l)}</button>`).join('')}</div>`;
+    const slider = (key, label, min, max, step) => `<div class="slider-row"><label for="fx-${key}">${label}</label><input type="range" id="fx-${key}" data-fx-range="${key}" min="${min}" max="${max}" step="${step}" value="${e ? e[key] : 1}"></div>`;
+    let h = fxShown(fxTarget) ? '' : '<p class="hint">This stripe isn’t on the jersey yet. Choose a stripe style first.</p>';
+    h += '<p class="sub-label">Pattern</p>' + pills('pattern', UB.FX.PATTERNS, e ? e.pattern : 'none');
+    if (e) {
+      h += '<p class="sub-label">Finish</p>' + pills('relief', UB.FX.RELIEFS, e.relief) + slider('scale', 'Size', 0.5, 2.5, 0.1) + slider('spacing', 'Spacing', 1, 2.5, 0.1) + slider('rotate', 'Angle', 0, 90, 5);
+      h += '<p class="sub-label">Colour</p>' + pills('color', UB.FX.COLORS, UB.isHex(e.color) ? '' : e.color);
+    }
+    $('#fxPanel').innerHTML = h;
+  }
+  function setFx(patch, done) {
+    const k = kit(), fx = { ...(k.fx || {}) };
+    if (patch.pattern === 'none') { const { [fxTarget]: _gone, ...rest } = fx; k.fx = rest; }
+    else k.fx = { ...fx, [fxTarget]: { ...UB.FX.DEFAULT, ...(fx[fxTarget] || {}), ...patch } };
+    render();
+    if (done) commit();
+  }
+  async function askAI() {
+    const text = $('#aiPrompt').value.trim(), note = $('#aiNote'), btn = $('#aiGo');
+    if (!text) { note.textContent = 'Describe the effect first, for example “debossed stars on the main stripe”.'; return; }
+    btn.disabled = true; btn.textContent = 'Thinking…';
+    let spec = null, via = 'ai';
+    try {
+      const r = await fetch(AI_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: text, target: fxTarget }) });
+      if (!r.ok) throw new Error('AI service unavailable');
+      spec = UB.FX.sanitize(await r.json());
+    } catch (err) {
+      via = 'local';
+      spec = UB.FX.parseText(text);
+    }
+    btn.disabled = false; btn.textContent = 'Ask AI';
+    if (!spec) { note.textContent = 'I couldn’t find a pattern in that. Try “debossed stars”, “raised dots” or “gold diagonal lines”.'; return; }
+    const { target, ...effect } = spec;
+    if (target) fxTarget = target;
+    setFx(effect, true);
+    note.textContent = (via === 'ai' ? 'Done. ' : 'Done with the built-in helper, because the AI service isn’t connected on this page. ') +
+      (fxShown(fxTarget) ? 'Adjust anything below.' : 'That stripe isn’t on the jersey yet, so pick a stripe style to see it.');
+  }
+
+  /* ---------------- logo cut-out ---------------- */
+  async function maybeCutout(url) {
+    if (!UB.cutout || url.startsWith('data:image/svg')) return url;
+    const im = await UB.cutout.load(url);
+    return UB.cutout.hasAlpha(im) ? url : openCutout(im, url);
+  }
+  function openCutout(im, url) {
+    return new Promise((resolve) => {
+      const guess = UB.cutout.guessBackground(im), o = { bg: guess.color, tolerance: 22, soft: 35, inner: false };
+      const cv = $('#cutCanvas'), modal = $('#cutModal');
+      let picking = false, raf = 0;
+      const sw = () => { $('#cutSwatch').style.background = `rgb(${o.bg.join(',')})`; };
+      const draw = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          const src = picking ? (() => { const c = document.createElement('canvas'); c.width = im.w; c.height = im.h; c.getContext('2d').putImageData(im.data, 0, 0); return c; })() : UB.cutout.run(im, o);
+          cv.width = src.width; cv.height = src.height;
+          cv.getContext('2d').drawImage(src, 0, 0);
+        });
+      };
+      $('#cutNote').textContent = guess.uniform > 0.7
+        ? 'This image has a background. We found it and removed it. Adjust if it looks off.'
+        : 'The background isn’t one plain colour, so the result may need tuning. For busy photos, use a background remover first.';
+      $('#cutTol').value = o.tolerance; $('#cutSoft').value = o.soft; $('#cutInner').checked = false;
+      $('#cutPick').textContent = 'Pick background colour';
+      sw(); draw();
+      modal.hidden = false;
+      const done = (v) => {
+        modal.hidden = true;
+        $('#cutTol').oninput = $('#cutSoft').oninput = $('#cutInner').onchange = $('#cutPick').onclick = $('#cutUse').onclick = $('#cutKeep').onclick = cv.onclick = null;
+        resolve(v);
+      };
+      $('#cutTol').oninput = (e) => { o.tolerance = +e.target.value; draw(); };
+      $('#cutSoft').oninput = (e) => { o.soft = +e.target.value; draw(); };
+      $('#cutInner').onchange = (e) => { o.inner = e.target.checked; draw(); };
+      $('#cutPick').onclick = () => { picking = !picking; $('#cutPick').textContent = picking ? 'Click the background…' : 'Pick background colour'; draw(); };
+      cv.onclick = (e) => {
+        if (!picking) return;
+        const r = cv.getBoundingClientRect(), k = Math.min(r.width / im.w, r.height / im.h);
+        const x = Math.floor((e.clientX - r.left - (r.width - im.w * k) / 2) / k), y = Math.floor((e.clientY - r.top - (r.height - im.h * k) / 2) / k);
+        if (x < 0 || y < 0 || x >= im.w || y >= im.h) return;
+        const i = (y * im.w + x) * 4;
+        o.bg = [im.data.data[i], im.data.data[i + 1], im.data.data[i + 2]];
+        picking = false; $('#cutPick').textContent = 'Pick background colour'; sw(); draw();
+      };
+      $('#cutUse').onclick = () => done(UB.cutout.run(im, o).toDataURL('image/png'));
+      $('#cutKeep').onclick = () => done(url);
+      modal.onkeydown = (e) => { if (e.key === 'Escape') done(null); };
+    });
   }
 
   /* ---------------- colour each part ---------------- */
@@ -403,12 +515,14 @@
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== route; });
     $$('[data-nav]').forEach((a) => (a.dataset.nav === route ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
     closePicker();
+    document.body.dataset.route = route;
     window.scrollTo(0, 0);
     document.title = { home: 'Digital Jersey', design: 'Design · Digital Jersey', explore: 'Explore · Digital Jersey' }[route];
     if (route === 'home') renderHome();
     if (route === 'explore') renderExplore();
     syncControls();
     render();
+    showTab(activeTab);
   }
 
   /* ---------------- events ---------------- */
@@ -418,6 +532,7 @@
 
     document.addEventListener('input', (e) => {
       const el = e.target;
+      if (el.matches('[data-fx-range]')) { setFx({ [el.dataset.fxRange]: +el.value }, false); return; }
       if (el.matches('[data-bind]')) {
         let v = el.type === 'checkbox' ? el.checked : el.type === 'range' ? parseFloat(el.value) : el.value;
         if (el.dataset.digits !== undefined) { v = String(v).replace(/\D/g, '').slice(0, 2); el.value = v; }
@@ -436,7 +551,7 @@
     });
     document.addEventListener('change', (e) => {
       const el = e.target;
-      if (el.matches('[data-bind], [data-slot]')) commit();
+      if (el.matches('[data-bind], [data-slot], [data-fx-range]')) commit();
       if (el.id === 'popColor') commit();
       if (el.id === 'popHex' && popZone) {
         let v = el.value.trim();
@@ -454,6 +569,15 @@
         syncControls(); render(); commit();
         return;
       }
+      const fxT = t.closest('[data-fx-target]');
+      if (fxT) { fxTarget = fxT.dataset.fxTarget; renderFx(); return; }
+      const fxK = t.closest('[data-fx-key]');
+      if (fxK) { setFx({ [fxK.dataset.fxKey]: fxK.dataset.val }, true); return; }
+      const tabBtn = t.closest('[data-tabbtn]');
+      if (tabBtn) { showTab(tabBtn.dataset.tabbtn); return; }
+      if (t.closest('#aiGo')) { askAI(); return; }
+      const sum = t.closest('details.opt > summary');
+      if (sum && mobile()) { e.preventDefault(); return; }
       const kitBtn = t.closest('[data-kit]');
       if (kitBtn) { state.active = kitBtn.dataset.kit; store.write(STORE_KEY, state); syncControls(); render(); return; }
       const tpl = t.closest('[data-tpl]');
@@ -512,7 +636,11 @@
       if (f && pickSlot) accept(pickSlot, f);
     });
     async function accept(slot, file) {
-      try { SLOTS[slot].set(await readImage(file)); syncControls(); render(); commit(); toast(`${SLOTS[slot].label} added`); } catch (err) { toast(err.message); }
+      try {
+        const img = await maybeCutout(await readImage(file));
+        if (!img) return;
+        SLOTS[slot].set(img); syncControls(); render(); commit(); toast(`${SLOTS[slot].label} added`);
+      } catch (err) { toast(err.message); }
     }
     const drops = $('#drops');
     drops.addEventListener('dragover', (e) => { const b = e.target.closest('.drop'); if (b) { e.preventDefault(); b.classList.add('is-over'); } });
@@ -521,6 +649,8 @@
 
     $('#undoBtn').onclick = undo;
     $('#redoBtn').onclick = redo;
+    $('#aiPrompt').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); askAI(); } });
+    addEventListener('resize', () => showTab(activeTab));
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { closePicker(); closeModal(); }
       const mod = e.metaKey || e.ctrlKey;
@@ -530,7 +660,7 @@
 
   // Which part is under the pointer on the preview (photo or flat back)?
   function previewZone(e) {
-    if (route !== 'design') return null;
+    if (route !== 'design' || view.moved) return null;
     const c = e.target.closest && e.target.closest('#photoCanvas');
     if (c) {
       const r = c.getBoundingClientRect();
@@ -540,6 +670,86 @@
     return z ? z.dataset.zone : null;
   }
 
+  /* ---------------- phone tabs ---------------- */
+  const mobile = () => matchMedia('(max-width: 960px)').matches;
+  function showTab(tab) {
+    activeTab = tab;
+    $$('[data-tabbtn]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tabbtn === tab)));
+    $$('.options .opt[data-tab]').forEach((el) => {
+      el.classList.toggle('tab-off', mobile() && el.dataset.tab !== tab);
+      if (mobile() && el.tagName === 'DETAILS') el.open = true;
+    });
+    $('#tabbar [aria-selected="true"]').scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  /* ---------------- pinch, pan and swipe on the preview ---------------- */
+  const view = { s: 1, x: 0, y: 0, moved: false };
+  function applyView(animate) {
+    const layer = $('#zoomLayer');
+    layer.style.transition = animate ? 'transform 0.18s ease' : 'none';
+    layer.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
+    $('#zoomReset').hidden = view.s <= 1.01;
+  }
+  function clampView() {
+    const r = $('#previewCard').getBoundingClientRect(), maxX = (r.width * (view.s - 1)) / 2, maxY = (r.height * (view.s - 1)) / 2;
+    view.x = Math.max(-maxX, Math.min(maxX, view.x)); view.y = Math.max(-maxY, Math.min(maxY, view.y));
+  }
+  function resetView(animate) { view.s = 1; view.x = 0; view.y = 0; applyView(animate); }
+  function flipSide() { side = side === 'front' ? 'back' : 'front'; resetView(false); render(); }
+
+  function wireGestures() {
+    const card = $('#previewCard'), pts = new Map();
+    let start = null, pinch = null;
+    const centre = () => { const a = [...pts.values()]; return a.length === 2 ? { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2, d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) } : null; };
+    card.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.side-pills, .zoom-reset')) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      view.moved = false;
+      if (pts.size === 1) start = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+      if (pts.size === 2) { const c = centre(); pinch = { d: c.d, s: view.s, x: view.x, y: view.y, cx: c.x, cy: c.y }; }
+    });
+    addEventListener('pointermove', (e) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2 && pinch) {
+        const c = centre(), r = card.getBoundingClientRect();
+        view.s = Math.max(1, Math.min(4, pinch.s * (c.d / pinch.d)));
+        // keep the point between the fingers where it was
+        const ox = pinch.cx - (r.left + r.width / 2 - pinch.x), oy = pinch.cy - (r.top + r.height / 2 - pinch.y);
+        view.x = pinch.x + (c.x - pinch.cx) - ox * (view.s / pinch.s - 1);
+        view.y = pinch.y + (c.y - pinch.cy) - oy * (view.s / pinch.s - 1);
+        view.moved = true; clampView(); applyView(false);
+      } else if (pts.size === 1 && start) {
+        const dx = e.clientX - start.x, dy = e.clientY - start.y;
+        if (Math.hypot(dx, dy) > 6) view.moved = true;
+        if (view.s > 1.01) { view.x = start.vx + dx; view.y = start.vy + dy; clampView(); applyView(false); }
+        else if (view.moved && Math.abs(dx) > Math.abs(dy)) { view.x = dx * 0.5; view.y = 0; applyView(false); }
+      }
+    });
+    const end = (e) => {
+      if (!pts.has(e.pointerId)) return;
+      const wasOne = pts.size === 1;
+      pts.delete(e.pointerId);
+      if (wasOne && start && view.s <= 1.01 && view.moved) {
+        const dx = e.clientX - start.x, dy = e.clientY - start.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) { flipSide(); }
+        else resetView(true);
+      }
+      if (pts.size < 2) pinch = null;
+      if (pts.size === 0) { start = null; if (view.s <= 1.01) resetView(false); setTimeout(() => { view.moved = false; }, 0); }
+    };
+    addEventListener('pointerup', end);
+    addEventListener('pointercancel', end);
+    card.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;      // pinch on a trackpad, or ctrl and scroll
+      e.preventDefault();
+      view.s = Math.max(1, Math.min(4, view.s * Math.exp(-e.deltaY * 0.01)));
+      clampView(); applyView(false);
+    }, { passive: false });
+    card.addEventListener('dblclick', () => { if (view.s > 1.01) resetView(true); else { view.s = 2; applyView(true); } });
+    $('#zoomReset').addEventListener('click', () => resetView(true));
+  }
+
   /* ---------------- boot ---------------- */
   function boot() {
     state = normalize(store.read(STORE_KEY));
@@ -547,6 +757,7 @@
     renderSchemes();
     renderDrops();
     wire();
+    wireGestures();
     commit();
     go();
     if (document.fonts) document.fonts.ready.then(render);

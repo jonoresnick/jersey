@@ -96,27 +96,37 @@
             </div>
           </div>
           <div class="preview-card" id="previewCard">
-            <canvas id="photoCanvas" width="1098" height="1122" role="img" aria-label="A player wearing your design"></canvas>
-            <div class="back-wrap" id="backWrap" hidden></div>
-          </div>
-          <div class="preview-foot">
-            <div class="pills small" id="sidePills" role="radiogroup" aria-label="Preview side">
+            <div class="zoom-layer" id="zoomLayer">
+              <canvas id="photoCanvas" width="1098" height="1122" role="img" aria-label="A player wearing your design"></canvas>
+              <div class="back-wrap" id="backWrap" hidden></div>
+            </div>
+            <div class="pills small side-pills" id="sidePills" role="radiogroup" aria-label="Preview side">
               <button class="pill" type="button" role="radio" data-side="front" aria-checked="true">Front</button>
               <button class="pill" type="button" role="radio" data-side="back" aria-checked="false">Back</button>
             </div>
+            <button class="zoom-reset" id="zoomReset" type="button" hidden>Reset zoom</button>
+          </div>
+          <div class="preview-foot">
             <p class="hint" id="previewHint">Click any part to change its colour.</p>
+          </div>
+          <div class="tabbar" id="tabbar" role="tablist" aria-label="Design sections">
+            <button type="button" role="tab" data-tabbtn="style" aria-selected="true">Style</button>
+            <button type="button" role="tab" data-tabbtn="stripes" aria-selected="false">Stripes</button>
+            <button type="button" role="tab" data-tabbtn="text" aria-selected="false">Text and logos</button>
+            <button type="button" role="tab" data-tabbtn="kit" aria-selected="false">Pants and socks</button>
+            <button type="button" role="tab" data-tabbtn="parts" aria-selected="false">Each part</button>
           </div>
         </div>
 
         <div class="options">
-          <div class="opt" id="optKit">
+          <div class="opt" id="optKit" data-tab="style">
             <h2 class="opt-title">Which jersey</h2>
             <div class="pills" role="radiogroup" aria-label="Kit" id="kitPills"></div>
             <div class="pills sub" data-pills="kit.swap" data-source="SWEATERS" data-kind="bool" role="radiogroup" aria-label="Sweater"></div>
             <p class="hint">Light sweaters swap your first two colours, the usual way to make an away jersey.</p>
           </div>
 
-          <div class="opt">
+          <div class="opt" data-tab="style">
             <h2 class="opt-title">Scene</h2>
             <div class="pills" data-pills="view.scene" data-source="SCENES" role="radiogroup" aria-label="Scene"></div>
             <div id="poseBlock" hidden>
@@ -126,19 +136,19 @@
             <p class="hint">Put the player on the ice or in the arena, or download a transparent PNG for your own graphics.</p>
           </div>
 
-          <div class="opt">
+          <div class="opt" data-tab="style">
             <h2 class="opt-title">Pick a template</h2>
             <div class="tpl-grid" id="tplGrid"></div>
           </div>
 
-          <div class="opt">
+          <div class="opt" data-tab="style">
             <h2 class="opt-title">Team colours</h2>
             <div class="team-swatches" id="teamSwatches"></div>
             <p class="sub-label">Or start from a scheme</p>
             <div class="schemes" id="schemes"></div>
           </div>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="stripes">
             <summary class="opt-title">Stripes</summary>
             <p class="sub-label">Bottom of the jersey</p>
             <div class="pills" data-pills="kit.jersey.hem.style" data-source="STRIPE_SETS" role="radiogroup" aria-label="Hem stripes"></div>
@@ -148,7 +158,7 @@
             <div class="slider-row" data-hide-if="kit.jersey.sleeve.style=none"><label for="sleeveOffset">Height</label><input type="range" id="sleeveOffset" data-bind="kit.jersey.sleeve.offset" min="12" max="110" step="1"></div>
           </details>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="stripes">
             <summary class="opt-title">Pattern</summary>
             <div class="pills" data-pills="kit.jersey.pattern.type" data-source="PATTERNS" role="radiogroup" aria-label="Pattern"></div>
             <div data-hide-if="kit.jersey.pattern.type=none">
@@ -160,7 +170,22 @@
             </div>
           </details>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="stripes">
+            <summary class="opt-title">Stripe effects</summary>
+            <p class="sub-label first">Which stripe</p>
+            <div class="pills" id="fxTargets" role="radiogroup" aria-label="Stripe"></div>
+            <div class="ai-box">
+              <label class="sub-label" for="aiPrompt">Ask AI to design it</label>
+              <div class="ai-row">
+                <input class="text-input ai-input" id="aiPrompt" type="text" maxlength="200" placeholder="Debossed stars on the main stripe" autocomplete="off">
+                <button class="btn primary" id="aiGo" type="button">Ask AI</button>
+              </div>
+              <p class="hint" id="aiNote">Describe a pattern and how it should look. You can adjust the result below.</p>
+            </div>
+            <div id="fxPanel"></div>
+          </details>
+
+          <details class="opt fine" data-tab="stripes">
             <summary class="opt-title">Collar and yoke</summary>
             <p class="sub-label">Collar</p>
             <div class="pills" data-pills="kit.jersey.collar" data-source="COLLARS" role="radiogroup" aria-label="Collar"></div>
@@ -169,7 +194,7 @@
             <div class="slider-row" data-hide-if="kit.jersey.yoke=none"><label for="yokeDepth">Depth</label><input type="range" id="yokeDepth" data-bind="kit.jersey.yokeDepth" min="70" max="140" step="1"></div>
           </details>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="text">
             <summary class="opt-title">Name and number</summary>
             <div class="field-row">
               <label class="field"><span>Name on back</span><input class="text-input wide" type="text" id="playerName" data-bind="player.name" maxlength="16" spellcheck="false" autocomplete="off"></label>
@@ -188,7 +213,7 @@
             </div>
           </details>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="text">
             <summary class="opt-title">Logos</summary>
             <p class="hint first">Drop an image on a box, or click it to choose a file. PNGs with a transparent background work best.</p>
             <div class="drops" id="drops"></div>
@@ -201,7 +226,7 @@
             <div class="slider-row" data-hide-if="crest.style=none"><label for="crestScale">Crest size</label><input type="range" id="crestScale" data-bind="crest.scale" min="0.6" max="1.3" step="0.05"></div>
           </details>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="kit">
             <summary class="opt-title">Pants and socks</summary>
             <p class="sub-label">Pants stripe</p>
             <div class="pills" data-pills="kit.pants.stripe" data-source="PANTS_STRIPES" role="radiogroup" aria-label="Pants stripe"></div>
@@ -210,7 +235,7 @@
             <div class="slider-row"><label for="sockOffset">Height</label><input type="range" id="sockOffset" data-bind="kit.socks.offset" min="0" max="150" step="1"></div>
           </details>
 
-          <details class="opt fine">
+          <details class="opt fine" data-tab="parts">
             <summary class="opt-title">Colour each part</summary>
             <p class="hint first">Pick a team colour or a custom colour for any part. You can also click the part in the preview.</p>
             <div id="zones"></div>
@@ -255,12 +280,31 @@
       <div class="modal-actions" id="modalActions"></div>
     </div>
   </div>
+  <div id="cutModal" class="modal" hidden>
+    <div class="modal-card cut-card" role="dialog" aria-modal="true" aria-labelledby="cutTitle">
+      <h2 id="cutTitle" class="opt-title">Remove the background?</h2>
+      <p class="hint first" id="cutNote"></p>
+      <div class="cut-stage"><canvas id="cutCanvas"></canvas></div>
+      <div class="cut-controls">
+        <div class="slider-row"><label for="cutTol">Remove more</label><input type="range" id="cutTol" min="0" max="100" value="22"></div>
+        <div class="slider-row"><label for="cutSoft">Soft edge</label><input type="range" id="cutSoft" min="0" max="100" value="35"></div>
+        <label class="check"><input type="checkbox" id="cutInner"><span>Also remove matching areas inside the logo</span></label>
+        <div class="cut-pick"><button class="btn" type="button" id="cutPick">Pick background colour</button><i class="cut-swatch" id="cutSwatch"></i></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="cutKeep">Keep original</button>
+        <button class="btn primary" type="button" id="cutUse">Use cut-out</button>
+      </div>
+    </div>
+  </div>
   <input type="file" id="logoFile" accept="image/*" hidden>
 
   <script src="js/data.js"></script>
   <script src="js/color.js"></script>
   <script src="js/patterns.js"></script>
   <script src="js/render.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/cutout.js"></script>
   <script src="js/photo-assets.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/photo.js"></script>

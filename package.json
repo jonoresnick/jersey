@@ -1,0 +1,10 @@
+{
+  "name": "digital-jersey",
+  "private": true,
+  "type": "module",
+  "description": "Design a hockey jersey in your team's colours. The site has no build step; this file only installs what the AI function needs.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.13.0",
+    "zod": "^3.25.0"
+  }
+}

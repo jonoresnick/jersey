@@ -77,19 +77,38 @@
     const yoke = j.yoke !== 'none'
       ? `<g transform="${T.flat}">${j.yokeTrim > 0 ? `<path d="${yp}" transform="translate(0 ${j.yokeTrim})" fill="${col('yokeTrim')}"/>` : ''}<path d="${yp}" fill="${col('yoke')}"/></g>` : '';
 
+    // Stripe effects: a pattern over a stripe, plus a relief layer that lights it as raised or pressed.
+    const fxs = kit.fx || {};
+    let fxDefs = '';
+    const relief = ['', '', '', ''];
+    const put = (layer, zone, dPath, baseCol) => {
+      let s = `<path d="${dPath}" fill="${baseCol}"/>`;
+      const e = fxs[zone];
+      if (e && e.pattern && e.pattern !== 'none' && UB.FX) {
+        const id = `fx-${zone}-${layer}`;
+        fxDefs += UB.FX.patternDef(e, id, UB.FX.paint(e, d, kit, baseCol));
+        s += `<path d="${dPath}" fill="url(#${id})"/>`;
+        if (e.relief !== 'flat') {
+          fxDefs += UB.FX.patternDef(e, id + 'r', e.relief === 'deboss' ? '#00ff00' : '#ff0000');
+          relief[layer] += `<path d="${dPath}" fill="url(#${id}r)"/>`;
+        }
+      }
+      return s;
+    };
+
     // Layer 0: body
     let torso = `<rect width="${W}" height="${H}" fill="${col('body')}"/>${patArt}${yoke}`;
     for (const b of bands(j.hem.style)) {
       const off = (j.hem.offset + b.at * j.hem.size) * T.k, h = b.h * j.hem.size * T.k;
       const ext = b.at === 0 && j.hem.offset < 3 ? 30 : 0;
-      torso += `<path d="${hBand(T.x0, T.x1, (x) => T.hem(x) - off + ext, h + ext, T.bow)}" fill="${col('stripe' + b.c)}"/>`;
+      torso += put(0, 'stripe' + b.c, hBand(T.x0, T.x1, (x) => T.hem(x) - off + ext, h + ext, T.bow), col('stripe' + b.c));
     }
     // Layer 1: sleeves
     let sleeves = `<rect width="${W}" height="${H}" fill="${col('sleeves')}"/>${j.pattern.area === 'all' ? patArt : ''}${yoke}`;
     for (const s of G().sleeves) {
       for (const b of bands(j.sleeve.style)) {
         const a = (j.sleeve.offset + b.at * j.sleeve.size) * s.k, h = b.h * j.sleeve.size * s.k;
-        sleeves += `<path d="${sleeveBand(s, a, a + h)}" fill="${col('stripe' + b.c)}"/>`;
+        sleeves += put(1, 'stripe' + b.c, sleeveBand(s, a, a + h), col('stripe' + b.c));
       }
     }
     // Layer 2: pants
@@ -97,16 +116,16 @@
     let pants = `<rect width="${W}" height="${H}" fill="${col('pants')}"/>`;
     const side = (inset, w, z) => {
       const [a, b] = pc.left, [c, e] = pc.right;
-      return `<path d="M${a[0] + inset} ${a[1]}L${a[0] + inset + w} ${a[1]}L${b[0] + inset + w} ${b[1]}L${b[0] + inset} ${b[1]}Z` +
-        `M${c[0] - inset} ${c[1]}L${c[0] - inset - w} ${c[1]}L${e[0] - inset - w} ${e[1]}L${e[0] - inset} ${e[1]}Z" fill="${col(z)}"/>`;
+      return put(2, z, `M${a[0] + inset} ${a[1]}L${a[0] + inset + w} ${a[1]}L${b[0] + inset + w} ${b[1]}L${b[0] + inset} ${b[1]}Z` +
+        `M${c[0] - inset} ${c[1]}L${c[0] - inset - w} ${c[1]}L${e[0] - inset - w} ${e[1]}L${e[0] - inset} ${e[1]}Z`, col(z));
     };
     switch (kit.pants.stripe) {
       case 'single': pants += side(-4, 22, 'pantsStripe1'); break;
       case 'outlined': pants += side(-4, 30, 'pantsStripe2') + side(1, 20, 'pantsStripe1'); break;
       case 'twin': pants += side(0, 7, 'pantsStripe1') + side(13, 7, 'pantsStripe1'); break;
       case 'hem':
-        pants += `<path d="${hBand(180, 400, () => pc.bottomL - 14, 14, 2)}${hBand(400, 600, () => pc.bottomR - 14, 14, 2)}" fill="${col('pantsStripe1')}"/>`;
-        pants += `<path d="${hBand(180, 400, () => pc.bottomL - 33, 5, 2)}${hBand(400, 600, () => pc.bottomR - 33, 5, 2)}" fill="${col('pantsStripe2')}"/>`;
+        pants += put(2, 'pantsStripe1', hBand(180, 400, () => pc.bottomL - 14, 14, 2) + hBand(400, 600, () => pc.bottomR - 14, 14, 2), col('pantsStripe1'));
+        pants += put(2, 'pantsStripe2', hBand(180, 400, () => pc.bottomL - 33, 5, 2) + hBand(400, 600, () => pc.bottomR - 33, 5, 2), col('pantsStripe2'));
         break;
     }
     // Layer 3: socks
@@ -115,12 +134,16 @@
     for (const s of G().socks) {
       for (const b of bands(style)) {
         const off = (sk.offset + b.at * sk.size) * s.k, h = b.h * sk.size * s.k;
-        socks += `<path d="${hBand(s.x0, s.x1, (x) => s.ref(x) - off, h, s.bow)}" fill="${col(b.c === 1 ? 'sockStripe1' : 'sockStripe2')}"/>`;
+        const zn = b.c === 1 ? 'sockStripe1' : 'sockStripe2';
+        socks += put(3, zn, hBand(s.x0, s.x1, (x) => s.ref(x) - off, h, s.bow), col(zn));
       }
     }
     const layer = (k, inner) => `<g transform="translate(0 ${k * H})"><svg x="0" y="0" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" overflow="hidden">${inner}</svg></g>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H * N_LAYERS}" viewBox="0 0 ${W} ${H * N_LAYERS}">` +
-      layer(0, torso) + layer(1, sleeves) + layer(2, pants) + layer(3, socks) + `</svg>`;
+    const wrap = (inner) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H * N_LAYERS}" viewBox="0 0 ${W} ${H * N_LAYERS}"><defs>${fxDefs}</defs>${inner}</svg>`;
+    return {
+      art: wrap(layer(0, torso) + layer(1, sleeves) + layer(2, pants) + layer(3, socks)),
+      relief: relief.some(Boolean) ? wrap(relief.map((r, k) => layer(k, r)).join('')) : null,
+    };
   }
 
   /* ---------- lettering, crest and logos (canvas, so web fonts work) ---------- */
@@ -319,9 +342,14 @@
     poseId = UB.POSES.some((p) => p.id === want) ? want : UB.POSES[0].id;
     const a = await loadAssets();
     const { W, H } = a;
-    const svg = artSVG(d, kit);
+    const { art: svg, relief: rsvg } = artSVG(d, kit);
     const art = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
     imgCache.delete('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+    let rImg = null;
+    if (rsvg) {
+      rImg = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(rsvg));
+      imgCache.delete('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(rsvg));
+    }
     if (my !== seq) return false;
     const atlas = document.createElement('canvas');
     atlas.width = W; atlas.height = H * N_LAYERS;
@@ -336,6 +364,24 @@
     const pb = boxBlur(pa, W, H * N_LAYERS, 1);
     if (my !== seq) return false;
     const ad = ax.getImageData(0, 0, W, H * N_LAYERS).data;
+    // Relief layer: where effects are raised (red) or pressed in (green).
+    let ra = null, rb = null, rs = null;
+    if (rImg) {
+      const rc = document.createElement('canvas');
+      rc.width = W; rc.height = H * N_LAYERS;
+      const rx = rc.getContext('2d');
+      rx.drawImage(rImg, 0, 0);
+      const rd = rx.getImageData(0, 0, W, H * N_LAYERS).data, tot = W * H * N_LAYERS;
+      ra = new Float32Array(tot);
+      const sg = new Float32Array(tot);
+      for (let i = 0; i < tot; i++) {
+        const al = rd[i * 4 + 3] / 255;
+        ra[i] = al;
+        sg[i] = al * (rd[i * 4 + 1] > rd[i * 4] ? -1 : 1);
+      }
+      rb = boxBlur(ra, W, H * N_LAYERS, 1);
+      rs = boxBlur(sg, W, H * N_LAYERS, 3);
+    }
 
     const solid = {};
     for (const z of ['collar', 'gloves', 'glovesTrim', 'helmet']) solid[z] = UB.hexToRgb(UB.color(d, kit, z));
@@ -369,6 +415,16 @@
             D *= 1 + al * (((x + y) & 1 ? 0.025 : -0.025) + ((x * 7 + y * 3) % 5 === 0 ? -0.03 : 0));
             S += al * Math.max(0, edge) * 18;         // a little satin catch-light on the twill
           }
+        }
+      }
+      if (ra && ly !== null) {
+        // Raised (embossed) or pressed-in (debossed) pattern: light from the top left.
+        const q = i + ly * n, x = i % W, y = (i - x) / W;
+        if (ra[q] > 0 || rb[q] > 0) {
+          const up = y > 1 && x > 1 ? rb[q - 2 * W - 2] : 0, dn = y < H - 2 && x < W - 2 ? rb[q + 2 * W + 2] : 0;
+          const s = rs[q] < 0 ? -1 : 1, edge = dn - up;
+          D *= 1 + s * 0.7 * edge + (s > 0 ? 0.05 : -0.12) * ra[q];
+          if (s > 0) S += Math.max(0, edge) * 14;
         }
       }
       r = r * D + S; g = g * D + S; b = b * D + S;
