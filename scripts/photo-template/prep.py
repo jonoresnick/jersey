@@ -264,6 +264,11 @@ edge_img[..., 2] = (alpha * 255).astype(np.uint8)
 edge_img[..., 1] = seam.astype(np.uint8) * 255
 cv2.imwrite('out/edge.png', edge_img)
 cv2.imwrite('out/clean.jpg', clean, [cv2.IMWRITE_JPEG_QUALITY, 92])
+# Player cut-out (white = player) used to put the player on other backgrounds.
+neck_cut = poly_mask([(338, 196), (430, 196), (428, 215), (425, 235), (408, 250), (380, 252), (352, 246), (340, 230), (336, 210)])
+flat_bg = cv2.morphologyEx(bg_like.astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8)).astype(bool)
+cut = ((fg & ~(helm & flat_bg)) | edit | stick | neck_cut).astype(np.uint8) * 255
+cv2.imwrite('out/cut.png', cut)
 
 pal = np.array([[0, 0, 0], [230, 80, 80], [80, 200, 80], [80, 80, 230], [240, 240, 60], [200, 80, 200], [60, 220, 220], [250, 150, 50], [150, 250, 150], [120, 120, 255]], np.uint8)
 vis = (img * 0.45 + pal[lab][:, :, ::-1] * 0.55).astype(np.uint8)

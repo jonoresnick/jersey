@@ -16,7 +16,13 @@
    ===================================================================== */
 (function () {
   const UB = window.UB;
-  const A = () => UB.PHOTO_ASSETS;
+  /* Poses: each pose is a photo plus its maps (assets) and where things sit on it (geo).
+     To add a pose, push { id, label, assets, geo } onto UB.POSES (see README). */
+  UB.POSES = UB.POSES || [{ id: 'stand', label: 'Standing', assets: UB.PHOTO_ASSETS, geo: null }];
+  let poseId = UB.POSES[0].id;
+  const pose = () => UB.POSES.find((p) => p.id === poseId) || UB.POSES[0];
+  const A = () => pose().assets;
+  const G = () => pose().geo;
 
   const LABELS = { 1: 'torso', 2: 'sleeveL', 3: 'sleeveR', 4: 'collar', 5: 'pants', 6: 'socks', 7: 'gloves', 8: 'glovesTrim', 9: 'helmet' };
   const ZONE_OF = { torso: 'body', sleeveL: 'sleeves', sleeveR: 'sleeves', collar: 'collar', pants: 'pants', socks: 'socks', gloves: 'gloves', glovesTrim: 'glovesTrim', helmet: 'helmet' };
@@ -63,7 +69,7 @@
 
   function artSVG(d, kit) {
     const W = A().width, H = A().height, j = kit.jersey, col = (z) => UB.color(d, kit, z);
-    const T = GEO.torso;
+    const T = G().torso;
     const pat = UB.PATTERNS[j.pattern.type];
     const patArt = pat && j.pattern.type !== 'none'
       ? `<g transform="${T.pattern}" opacity="${j.pattern.opacity}">${pat.draw({ color: col('pattern'), size: j.pattern.size, pos: j.pattern.pos, id: 'ph' })}</g>` : '';
@@ -80,14 +86,14 @@
     }
     // Layer 1: sleeves
     let sleeves = `<rect width="${W}" height="${H}" fill="${col('sleeves')}"/>${j.pattern.area === 'all' ? patArt : ''}${yoke}`;
-    for (const s of GEO.sleeves) {
+    for (const s of G().sleeves) {
       for (const b of bands(j.sleeve.style)) {
         const a = (j.sleeve.offset + b.at * j.sleeve.size) * s.k, h = b.h * j.sleeve.size * s.k;
         sleeves += `<path d="${sleeveBand(s, a, a + h)}" fill="${col('stripe' + b.c)}"/>`;
       }
     }
     // Layer 2: pants
-    const pc = GEO.pants;
+    const pc = G().pants;
     let pants = `<rect width="${W}" height="${H}" fill="${col('pants')}"/>`;
     const side = (inset, w, z) => {
       const [a, b] = pc.left, [c, e] = pc.right;
@@ -106,7 +112,7 @@
     // Layer 3: socks
     const sk = kit.socks, style = sk.style === 'match' ? j.hem.style : sk.style;
     let socks = `<rect width="${W}" height="${H}" fill="${col('socks')}"/>`;
-    for (const s of GEO.socks) {
+    for (const s of G().socks) {
       for (const b of bands(style)) {
         const off = (sk.offset + b.at * sk.size) * s.k, h = b.h * sk.size * s.k;
         socks += `<path d="${hBand(s.x0, s.x1, (x) => s.ref(x) - off, h, s.bow)}" fill="${col(b.c === 1 ? 'sockStripe1' : 'sockStripe2')}"/>`;
@@ -209,7 +215,7 @@
   async function drawLetters(ctx, d, kit) {
     const H = A().height, L = d.lettering, nf = fontOf(L.numberFont), col = (z) => UB.color(d, kit, z);
     const cols = { fill: col('number'), o1: col('numberOutline'), o2: col('numberOutline2') };
-    const T = GEO.torso, logos = d.photoLogos || {};
+    const T = G().torso, logos = d.photoLogos || {};
     await document.fonts.load(canvasFont(nf, 60)).catch(() => {});
     // Body
     ctx.save();
@@ -229,7 +235,7 @@
     if (L.sleeveNumbers && d.player.number) {
       ctx.save();
       ctx.beginPath(); ctx.rect(0, H, A().width, H); ctx.clip();
-      for (const s of GEO.sleeves) {
+      for (const s of G().sleeves) {
         const [x, y, rot, sx, size] = s.num, px = size * nf.size;
         ctx.save(); ctx.translate(x, H + y); ctx.rotate((rot * Math.PI) / 180); ctx.scale(sx, 1);
         drawText(ctx, d.player.number, 0, px * 0.36, px, nf, cols, Math.min(L.outlines, 1), px * 1.25);
@@ -238,7 +244,7 @@
       ctx.restore();
     }
     // Pants
-    const pc = GEO.pants;
+    const pc = G().pants;
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 2 * H, A().width, H); ctx.clip();
     ctx.translate(0, 2 * H);
@@ -276,10 +282,10 @@
   }
 
   /* ---------- assets ---------- */
-  let assets = null;
+  const assetsBy = {};
   async function loadAssets() {
-    if (assets) return assets;
-    const [base, maps, edge] = await Promise.all([loadImg(A().base), loadImg(A().maps), loadImg(A().edge)]);
+    if (assetsBy[poseId]) return assetsBy[poseId];
+    const [base, maps, edge, cut] = await Promise.all([loadImg(A().base), loadImg(A().maps), loadImg(A().edge), loadImg(A().cut)]);
     const W = A().width, H = A().height;
     const read = (im) => { const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.drawImage(im, 0, 0); return x.getImageData(0, 0, W, H).data; };
     const m = read(maps), e = edge ? read(edge) : null;
@@ -292,14 +298,25 @@
       alpha[i] = e ? e[i * 4] / 255 : (lab[i] ? 1 : 0);
       if (e && e[i * 4 + 1] > 127) seam.push(i);
     }
-    assets = { W, H, base: read(base), lab, dif, shn, alpha, seam: Int32Array.from(seam) };
-    return assets;
+    // Player cut-out, slightly feathered and pulled in so no grey backdrop shows on other scenes.
+    let cutA = null;
+    if (cut) {
+      const raw = new Float32Array(n), cp = read(cut);
+      for (let i = 0; i < n; i++) raw[i] = cp[i * 4] / 255;
+      const bl = boxBlur(raw, W, H, 1);
+      cutA = new Float32Array(n);
+      for (let i = 0; i < n; i++) cutA[i] = Math.max(0, Math.min(1, (bl[i] - 0.42) / 0.4));
+    }
+    assetsBy[poseId] = { W, H, base: read(base), lab, dif, shn, alpha, seam: Int32Array.from(seam), cutA };
+    return assetsBy[poseId];
   }
 
   /* ---------- compose ---------- */
   let seq = 0;
   async function render(d, kit, canvas) {
     const my = ++seq;
+    const want = d.view && d.view.pose;
+    poseId = UB.POSES.some((p) => p.id === want) ? want : UB.POSES[0].id;
     const a = await loadAssets();
     const { W, H } = a;
     const svg = artSVG(d, kit);
@@ -324,6 +341,8 @@
     for (const z of ['collar', 'gloves', 'glovesTrim', 'helmet']) solid[z] = UB.hexToRgb(UB.color(d, kit, z));
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
+    const sceneId = d.view && d.view.scene;
+    const onScene = !!(a.cutA && sceneId && sceneId !== 'photo' && UB.scenes && UB.scenes[sceneId]);
     const out = ctx.createImageData(W, H), o = out.data, base = a.base;
     const layerOf = [null, 0, 1, 1, null, 2, 3, null, null, null];
     const solidOf = [null, null, null, null, solid.collar, null, null, solid.gloves, solid.glovesTrim, solid.helmet];
@@ -368,17 +387,28 @@
         }
       }
     }
-    ctx.putImageData(out, 0, 0);
+    if (onScene) {
+      for (let i = 0; i < n; i++) o[i * 4 + 3] = a.cutA[i] * 255;
+      const pl = document.createElement('canvas');
+      pl.width = W; pl.height = H;
+      pl.getContext('2d').putImageData(out, 0, 0);
+      UB.scenes[sceneId].draw(ctx, W, H, d, kit);
+      ctx.drawImage(pl, 0, 0);
+    } else {
+      ctx.putImageData(out, 0, 0);
+    }
     return true;
   }
 
   function zoneAt(x, y) {
+    const assets = assetsBy[poseId];
     if (!assets) return null;
     const i = Math.floor(y) * assets.W + Math.floor(x);
     const l = LABELS[assets.lab[i]];
     return l ? ZONE_OF[l] : null;
   }
 
+  UB.POSES[0].geo = UB.POSES[0].geo || GEO;
   UB.photo = { render, zoneAt, available: () => !!UB.PHOTO_ASSETS, GEO };
   /* Shared with the 3D view: lettering, crest and logo drawing on a 2D canvas. */
   UB.paint = { drawText, drawCrest, drawImageIn, loadImg, fontOf, canvasFont };

@@ -139,7 +139,7 @@ UB.PATCHES = { none: 'None', mini: 'Mini crest', image: 'Your logo' };
 UB.PANTS_STRIPES = { none: 'None', single: 'Single', outlined: 'Outlined', twin: 'Twin', hem: 'Leg bands' };
 UB.SOCK_STYLES = Object.assign({ match: 'Match jersey hem' },
   Object.fromEntries(Object.entries(UB.STRIPE_SETS).map(([k, v]) => [k, v.label])));
-UB.VIEWS = { photo: 'Photo', model: '3D' };
+UB.SCENES = { photo: 'Photo', ice: 'Ice', arena: 'Arena', team: 'Team colour', clear: 'Transparent' };
 
 /* Starting values for a jersey. Templates only list what they change. */
 UB.DEFAULT_JERSEY = {

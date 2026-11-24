@@ -117,6 +117,16 @@
           </div>
 
           <div class="opt">
+            <h2 class="opt-title">Scene</h2>
+            <div class="pills" data-pills="view.scene" data-source="SCENES" role="radiogroup" aria-label="Scene"></div>
+            <div id="poseBlock" hidden>
+              <p class="sub-label">Pose</p>
+              <div class="pills" data-pills="view.pose" data-source="POSE_LABELS" role="radiogroup" aria-label="Pose"></div>
+            </div>
+            <p class="hint">Put the player on the ice or in the arena, or download a transparent PNG for your own graphics.</p>
+          </div>
+
+          <div class="opt">
             <h2 class="opt-title">Pick a template</h2>
             <div class="tpl-grid" id="tplGrid"></div>
           </div>
@@ -252,6 +262,7 @@
   <script src="js/patterns.js"></script>
   <script src="js/render.js"></script>
   <script src="js/photo-assets.js"></script>
+  <script src="js/scenes.js"></script>
   <script src="js/photo.js"></script>
   <script src="js/site.js"></script>
 </body>

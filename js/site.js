@@ -50,6 +50,7 @@
     s.kits = {};
     for (const k of Object.keys(UB.KIT_NAMES)) s.kits[k] = makeKit(UB.SAMPLE.kits[k] || { template: 'original' });
     s.active = UB.SAMPLE.active || 'home';
+    s.view = { scene: 'photo', pose: UB.POSES[0].id };
     return s;
   }
   function normalize(raw) {
@@ -132,6 +133,7 @@
       $('#photoCanvas').hidden = back;
       $('#backWrap').hidden = !back;
       if (back) $('#backWrap').innerHTML = UB.render.jersey(state, kit(), 'back', { attrs: 'role="img" aria-label="Back of the jersey"' });
+      $('#previewCard').classList.toggle('checker', state.view.scene === 'clear' && !back);
       $('#previewHint').textContent = back ? 'The back is a flat drawing. Click any part to change its colour.' : 'Click any part to change its colour.';
       $$('#sidePills .pill').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.side === side)));
       renderKitPills();
@@ -148,6 +150,8 @@
   const castVal = (el, v) => (el.dataset.kind === 'number' ? +v : el.dataset.kind === 'bool' ? v === 'true' : v);
 
   function buildPills() {
+    UB.POSE_LABELS = Object.fromEntries(UB.POSES.map((p) => [p.id, p.label]));
+    $('#poseBlock').hidden = UB.POSES.length < 2;
     $$('[data-pills]').forEach((el) => {
       const src = sourceOf(el.dataset.source);
       el.innerHTML = Object.entries(src).map(([k, v]) => {
