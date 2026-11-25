@@ -125,7 +125,6 @@
     do {
       dirty = false;
       if (route === 'design' && side === 'front') await paintPhoto(state, kit(), $('#photoCanvas'));
-      if (route === 'home') await paintPhoto(state, kit(), $('#heroCanvas'));
     } while (dirty);
     running = false;
   }
@@ -370,7 +369,7 @@
   function renderDrops() {
     $('#drops').innerHTML = Object.entries(SLOTS).map(([k, s]) =>
       `<div class="drop" data-drop="${k}"><button class="drop-box" type="button" data-pick aria-label="Upload ${esc(s.label.toLowerCase())}"></button>` +
-      `<div class="drop-meta"><strong>${esc(s.label)}</strong><span>${esc(s.where)}</span></div><button class="link" type="button" data-rm>Remove</button></div>`).join('');
+      `<div class="drop-meta"><strong>${esc(s.label)}</strong><span>${esc(s.where)}</span></div><div class="drop-links"><button class="link" type="button" data-asset-pick>From assets</button><button class="link" type="button" data-asset-save hidden>Save to assets</button><button class="link" type="button" data-rm>Remove</button></div></div>`).join('');
   }
   function syncDrops() {
     $$('#drops .drop').forEach((box) => {
@@ -382,6 +381,7 @@
       }
       box.classList.toggle('has-image', !!img);
       $('[data-rm]', box).hidden = !img;
+      $('[data-asset-save]', box).hidden = !img;
     });
   }
   function readImage(file) {
@@ -484,28 +484,19 @@
     location.hash = '#design';
   }
 
-  /* ---------------- home extras ---------------- */
-  function renderHome() {
-    const mini = (id) => UB.render.jersey(state, applyTemplate(clone(kit()), id), 'front', { thumb: true });
-    $('#howTiles').innerHTML = ['twoband', 'heritage', 'chevron', 'hoops', 'northern', 'fade'].map(mini).join('');
-    $('#howSwatches').innerHTML = state.team.palette.map((c) => `<i style="background:${c}"></i>`).join('');
-    $('#homeTemplates').innerHTML = UB.TEMPLATES.map((t) =>
-      `<a class="tpl-tile" href="#design" data-tpl-link="${t.id}">${mini(t.id)}<strong>${esc(t.name)}</strong><span>${esc(t.note)}</span></a>`).join('');
-  }
-
   /* ---------------- routing ---------------- */
   let route = 'home';
   function go() {
-    const [r, ...rest] = (location.hash || '#home').slice(1).split('/'), param = rest.join('/');
-    route = ['home', 'design', 'explore', 'signin', 'signup', 'library', 'team', 'account', 'view'].includes(r) ? r : 'home';
+    const [r0, ...rest] = (location.hash || '#home').slice(1).split('/'), param = rest.join('/');
+    const r = ({ home: 'design', library: 'saved', team: 'account' })[r0] || r0;
+    route = ['design', 'explore', 'signin', 'signup', 'saved', 'assets', 'account', 'view'].includes(r) ? r : 'design';
     const pageKey = route === 'signin' || route === 'signup' ? 'auth' : route;
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== pageKey; });
     $$('[data-nav]').forEach((a) => (a.dataset.nav === route ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
     closePicker();
     document.body.dataset.route = route;
     window.scrollTo(0, 0);
-    document.title = { home: 'Digital Jersey', design: 'Design · Digital Jersey', explore: 'Explore · Digital Jersey', signin: 'Log in · Digital Jersey', signup: 'Sign up · Digital Jersey', library: 'Library · Digital Jersey', team: 'Team · Digital Jersey', account: 'Account · Digital Jersey', view: 'Jersey reveal' }[route];
-    if (route === 'home') renderHome();
+    document.title = { design: 'Digital Jersey', explore: 'Explore · Digital Jersey', signin: 'Log in · Digital Jersey', signup: 'Sign up · Digital Jersey', saved: 'Saved designs · Digital Jersey', assets: 'Assets · Digital Jersey', account: 'Account · Digital Jersey', view: 'Jersey reveal' }[route];
     if (route === 'explore') renderExplore();
     syncControls();
     render();
@@ -570,8 +561,6 @@
       if (kitBtn) { state.active = kitBtn.dataset.kit; store.write(STORE_KEY, state); syncControls(); render(); return; }
       const tpl = t.closest('[data-tpl]');
       if (tpl) { applyTemplate(kit(), tpl.dataset.tpl); syncControls(); render(); commit(); return; }
-      const tplLink = t.closest('[data-tpl-link]');
-      if (tplLink) { applyTemplate(kit(), tplLink.dataset.tplLink); commit(); return; }
       const sch = t.closest('[data-scheme]');
       if (sch) { state.team.palette = UB.SCHEMES[+sch.dataset.scheme].colors.slice(); syncControls(); render(); commit(); return; }
       const sideBtn = t.closest('[data-side]');
@@ -736,6 +725,10 @@
     paint: paintPhoto,
     normalize: (d) => normalize(d),
     setDesign(d) { state = normalize(d); commit(); syncAll(); },
+    setLogo(slot, img) { SLOTS[slot].set(img); syncControls(); render(); commit(); },
+    getLogo: (slot) => SLOTS[slot].get(),
+    slotLabel: (slot) => SLOTS[slot].label,
+    prepareImage: async (file) => maybeCutout(await readImage(file)),
     newDesign(brand) {
       const d = sampleDesign();
       if (brand) {

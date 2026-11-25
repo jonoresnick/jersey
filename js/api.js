@@ -16,6 +16,7 @@
      members(wsId)  invite(wsId,email,role) -> {code}  joinWithCode(code)
      setRole(wsId,userId,role)  removeMember(wsId,userId)
      brand(wsId)  setBrand(wsId,brand)
+     assets(wsId)  addAsset({wsId,name,kind,image})  updateAsset(id,{name,kind})  deleteAsset(id)
      projects(wsId)  project(id)  loadVersion(projectId,versionId)
      saveProject({wsId,id,name,folder,design,thumb,label})
      renameProject(id,name)  moveProject(id,folder)  duplicateProject(id)  deleteProject(id)
@@ -30,9 +31,10 @@
   const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
   const fail = (msg) => { throw new Error(msg); };
-  const fresh = () => ({ users: [], workspaces: [], members: [], invites: [], projects: [], assets: {} });
+  const fresh = () => ({ users: [], workspaces: [], members: [], invites: [], projects: [], library: [], assets: {} });
 
   let db = read();
+  if (!db.library) db.library = [];
   function read() { try { return JSON.parse(localStorage.getItem(DB_KEY)) || fresh(); } catch (e) { return fresh(); } }
   function persist() {
     try { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
@@ -117,7 +119,7 @@
     },
     async exportData() {
       const u = need(), ids = db.members.filter((m) => m.userId === u.id).map((m) => m.wsId);
-      return { account: pub(u), teams: db.workspaces.filter((w) => ids.includes(w.id)), designs: db.projects.filter((p) => ids.includes(p.wsId)).map((p) => ({ ...p, versions: p.versions.map((v) => ({ ...v, design: unpack(v.design) })) })) };
+      return { account: pub(u), teams: db.workspaces.filter((w) => ids.includes(w.id)), assets: db.library.filter((a) => ids.includes(a.wsId)).map((a) => ({ ...a, image: db.assets[a.hash] })), designs: db.projects.filter((p) => ids.includes(p.wsId)).map((p) => ({ ...p, versions: p.versions.map((v) => ({ ...v, design: unpack(v.design) })) })) };
     },
 
     async workspaces() {
@@ -144,6 +146,7 @@
       db.workspaces = db.workspaces.filter((w) => w.id !== id);
       db.members = db.members.filter((m) => m.wsId !== id);
       db.projects = db.projects.filter((p) => p.wsId !== id);
+      db.library = db.library.filter((a) => a.wsId !== id);
       db.invites = db.invites.filter((i) => i.wsId !== id);
     },
     async deleteWorkspace(id) {
@@ -207,6 +210,30 @@
       const keep = (v) => { if (!v || !v.startsWith('data:')) return v || null; const h = fnv(v); db.assets[h] = v; return '@a:' + h; };
       db.workspaces.find((w) => w.id === wsId).brand = { palette: (brand.palette || []).slice(0, 5), crest: keep(brand.crest), sponsor: keep(brand.sponsor), teamName: brand.teamName || '' };
       persist();
+    },
+
+    async assets(wsId) {
+      needRole(wsId);
+      return db.library.filter((a) => a.wsId === wsId).sort((a, b) => b.created - a.created)
+        .map((a) => ({ id: a.id, wsId: a.wsId, name: a.name, kind: a.kind, created: a.created, byName: a.byName, image: db.assets[a.hash] || null }));
+    },
+    async addAsset({ wsId, name, kind, image }) {
+      const u = need(); needRole(wsId, 'edit');
+      if (typeof image !== 'string' || !image.startsWith('data:image/')) fail('That file isn’t an image.');
+      const h = fnv(image); db.assets[h] = image;
+      const a = { id: uid(), wsId, name: String(name || '').trim().slice(0, 60) || 'Untitled', kind: ['crest', 'sponsor', 'patch', 'other'].includes(kind) ? kind : 'other', hash: h, created: Date.now(), by: u.id, byName: u.name };
+      db.library.push(a); persist();
+      return a.id;
+    },
+    async updateAsset(id, { name, kind }) {
+      const a = db.library.find((x) => x.id === id) || fail('That asset no longer exists.'); needRole(a.wsId, 'edit');
+      if (name !== undefined) a.name = String(name).trim().slice(0, 60) || a.name;
+      if (kind !== undefined && ['crest', 'sponsor', 'patch', 'other'].includes(kind)) a.kind = kind;
+      persist();
+    },
+    async deleteAsset(id) {
+      const a = db.library.find((x) => x.id === id) || fail('That asset no longer exists.'); needRole(a.wsId, 'edit');
+      db.library = db.library.filter((x) => x !== a); persist();
     },
 
     async projects(wsId) {

@@ -2,16 +2,16 @@
 
 Design a hockey jersey and see it on a player. Built to look and work like Digital Stick: one page, hash routes, no build step.
 
-| Route | Page |
-| --- | --- |
-| `#home` | Hero, how it works, the twelve templates |
-| `#design` | The designer: kit, template, team colours, stripes, pattern, collar, name and number, logos, pants and socks |
-| `#explore` | Twelve starter designs in different colour schemes |
-| `#signin`, `#signup` | Log in and create an account |
-| `#library` | Your team's saved designs, with folders, search and version history |
-| `#team` | Members and roles, invite codes, brand kit |
-| `#account` | Profile, password, download or delete your data |
-| `#view/…` | A private reveal page, opened from a share link |
+| Tab | Route | What it is |
+| --- | --- | --- |
+| Home | `#home` | The designer. This is the landing page. |
+| Explore | `#explore` | Twelve starter designs in different colour schemes |
+| Saved designs | `#saved` | Your team's saved designs, with folders, search and version history |
+| Assets | `#assets` | The team's logos (crests, sponsors, patches) and brand colours |
+| Account | `#account` | Your profile, your team and its members, password, your data |
+| (no tab) | `#signin`, `#signup`, `#view/…` | Log in, sign up, and a private reveal page opened from a share link |
+
+Assets belong to the team, not to one person, so everyone on the team shares the same logos. On the Home tab, each logo box has "From assets" and "Save to assets".
 
 ## Run it
 
@@ -46,8 +46,8 @@ What works:
 
 - **Accounts:** sign up, log in, profile, change password, download or delete your data. Signing up creates a team of your own.
 - **Teams:** each account can be in several teams with a role: owner, editor or viewer. Owners invite people by email and get an invite code to send them; the invited person signs up with that email and enters the code. Viewers can look but not change or delete.
-- **Library:** designs saved to a team, with folders, search, rename, duplicate, delete and a history of up to 25 versions per design (restore any of them).
-- **Brand kit:** a team's colours, name, crest and sponsor, used when a new design is started from the Library.
+- **Saved designs:** designs saved to a team, with folders, search, rename, duplicate, delete and a history of up to 25 versions per design (restore any of them).
+- **Assets and brand colours:** a team library of logos, with a clean-up step for JPGs on plain backgrounds, plus brand colours, team name and default crest and sponsor that new designs start with.
 - **Private share links:** a link holds a snapshot of the design inside it. Add a password and the design is encrypted (AES-GCM), so it can't be opened without it. Add a "hidden until" date and the page shows a countdown. The date is checked by the page itself, so it keeps honest people honest but isn't a guarantee. Links can't be switched off once sent.
 - **Social posts:** PNG posts in five sizes (4:5, square, story, wide, X/Facebook) with a headline, footer and background, for one kit or all three, and a reveal video (WebM) that fades through each kit.
 

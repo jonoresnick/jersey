@@ -15,73 +15,17 @@
     <div class="container header-inner">
       <a class="brand" href="#home">Digital Jersey</a>
       <nav class="nav" aria-label="Main">
-        <a href="#design" data-nav="design">Design</a>
+        <a href="#home" data-nav="design">Home</a>
         <a href="#explore" data-nav="explore">Explore</a>
-        <a href="#library" data-nav="library" id="navLibrary" hidden>Library</a>
+        <a href="#saved" data-nav="saved">Saved designs</a>
+        <a href="#assets" data-nav="assets">Assets</a>
+        <a href="#account" data-nav="account">Account</a>
       </nav>
       <div class="auth-slot" id="authSlot"></div>
     </div>
   </header>
 
   <main>
-    <!-- Home -->
-    <section class="page home" data-page="home" aria-labelledby="homeTitle" hidden>
-      <div class="container hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Custom hockey jerseys</p>
-          <h1 class="hero-title" id="homeTitle" tabindex="-1">Your colours on your sweater.</h1>
-          <p class="lede">Pick a template, set your team colours and stripes, then add your crest, sponsor, name and number. See it on a player as you build it.</p>
-          <div class="hero-ctas">
-            <a class="btn primary lg" href="#design">Build your design</a>
-            <a class="btn ghost lg" href="#explore">Explore designs</a>
-          </div>
-          <p class="hero-note">12 templates · 13 colour schemes · Home, away and third</p>
-        </div>
-        <div class="hero-visual">
-          <div class="photo-card"><canvas id="heroCanvas" width="1098" height="1122" role="img" aria-label="A player wearing the current design"></canvas></div>
-        </div>
-      </div>
-
-      <div class="section how">
-        <div class="container">
-          <h2 class="section-title">How it works</h2>
-          <ol class="steps-list">
-            <li>
-              <div class="step-visual" aria-hidden="true"><div class="mock-tiles" id="howTiles"></div></div>
-              <h3>Pick a template</h3>
-              <p>Start from a classic layout. Yokes, chevrons, hoops and more, each ready to recolour.</p>
-            </li>
-            <li>
-              <div class="step-visual" aria-hidden="true"><div class="mock-swatches" id="howSwatches"></div></div>
-              <h3>Set your colours and stripes</h3>
-              <p>Five team colours drive the whole uniform. Change one and every part that uses it follows.</p>
-            </li>
-            <li>
-              <div class="step-visual" aria-hidden="true">
-                <div class="mock-field">
-                  <span class="mock-label">Number</span>
-                  <span class="mock-input"><span>18</span><i class="mock-caret"></i></span>
-                  <span class="mock-hint">Plus crest, sponsor and captain</span>
-                </div>
-              </div>
-              <h3>Add your crest, name and number</h3>
-              <p>Drop in your logo, a sponsor and a captaincy patch. Home, away and third kits share them.</p>
-            </li>
-          </ol>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="container">
-          <div class="section-head">
-            <h2 class="section-title">Twelve templates</h2>
-            <a class="text-link" href="#explore">See them in colour</a>
-          </div>
-          <div class="tpl-tiles" id="homeTemplates"></div>
-        </div>
-      </div>
-    </section>
-
     <!-- Design -->
     <section class="page step" data-page="design" aria-labelledby="designTitle" hidden>
       <div class="container layout">
@@ -276,13 +220,21 @@
 
     <!-- Account pages (filled in by js/saas.js) -->
     <section class="page auth" data-page="auth" aria-labelledby="authTitle" hidden><div class="container narrow-page" id="authBox"></div></section>
-    <section class="page library" data-page="library" aria-labelledby="libTitle" hidden><div class="container" id="libraryBox"></div></section>
-    <section class="page team" data-page="team" aria-labelledby="teamTitle" hidden><div class="container" id="teamBox"></div></section>
+    <section class="page saved" data-page="saved" aria-labelledby="libTitle" hidden><div class="container" id="libraryBox"></div></section>
+    <section class="page assets" data-page="assets" aria-labelledby="assetsTitle" hidden><div class="container" id="assetsBox"></div></section>
     <section class="page account" data-page="account" aria-labelledby="accTitle" hidden><div class="container narrow-page" id="accountBox"></div></section>
     <section class="page view" data-page="view" aria-labelledby="viewTitle" hidden><div class="container" id="viewBox"></div></section>
   </main>
 
   <footer class="site-footer"><div class="container"><span>Digital Jersey</span><span>Demo mode: accounts and designs are saved in this browser.</span></div></footer>
+
+  <nav class="bottom-nav" aria-label="Main">
+    <a href="#home" data-nav="design"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+    <a href="#explore" data-nav="explore"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg><span>Explore</span></a>
+    <a href="#saved" data-nav="saved"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg><span>Saved</span></a>
+    <a href="#assets" data-nav="assets"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4.5 17 4.5-4.5 3 3 3-3.5 4.5 5"/></svg><span>Assets</span></a>
+    <a href="#account" data-nav="account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.9-3.3 3.6-5 7-5s6.1 1.7 7 5"/></svg><span>Account</span></a>
+  </nav>
 
   <div id="popover" class="popover" role="dialog" aria-label="Choose colour" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>

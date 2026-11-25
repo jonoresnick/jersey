@@ -441,3 +441,47 @@ details.how > summary { cursor: pointer; font-weight: 700; font-size: 13px; colo
   .brand { font-size: 20px; }
   .header-inner { gap: 10px; }
 }
+
+/* ---------- redesign: tabs, assets ---------- */
+.page.saved, .page.assets { padding: 56px 0 80px; }
+.nav { gap: 34px; margin-right: 8px; }
+.nav a { font-size: 17px; }
+.bottom-nav { display: none; }
+.menu-team { padding: 6px 12px 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+
+.drop-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.drop-links .link { font-size: 12px; }
+
+.asset-drop { display: flex; flex-wrap: wrap; align-items: stretch; gap: 14px; margin-bottom: 28px; }
+.asset-drop-btn { flex: 1 1 320px; display: grid; justify-items: center; gap: 6px; padding: 26px 20px; border: 1.5px dashed var(--field); border-radius: 24px; background: #fff; cursor: pointer; text-align: center; color: var(--muted); }
+.asset-drop-btn strong { color: var(--ink); font-size: 16px; }
+.asset-drop-btn span { font-size: 13px; max-width: 460px; }
+.asset-drop-btn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.asset-drop-btn:hover, .asset-drop.is-over .asset-drop-btn { border-color: var(--brand); color: var(--brand); }
+.asset-kind { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; align-self: center; }
+.asset-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+.asset-card { cursor: default; }
+.asset-img { display: grid; place-items: center; aspect-ratio: 1; padding: 14px; border-radius: 22px; background: #fff conic-gradient(#eceef1 25%, #fff 0 50%, #eceef1 0 75%, #fff 0) 0 0 / 18px 18px; border: 1px solid var(--line); overflow: hidden; }
+.asset-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.brand-title { margin-top: 56px; }
+.brand-fields { margin: 6px 0 18px; gap: 18px; }
+.asset-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-height: 60vh; overflow: auto; }
+.asset-pick-item { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 18px; background: #fff; cursor: pointer; font-size: 12px; font-weight: 700; text-align: center; }
+.asset-pick-item:hover { border-color: var(--ink); }
+.team-danger { margin-top: 22px; }
+#teamBox .sub-label { margin-top: 22px; }
+#teamBox .section-title.sm { margin-top: 44px; }
+
+@media (max-width: 960px) {
+  .nav { display: none; }
+  .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .page.saved, .page.assets { padding-top: 32px; }
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .bottom-nav { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, 0.94); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-top: 1px solid var(--line); }
+  .bottom-nav a { display: grid; justify-items: center; gap: 2px; padding: 4px 0; text-decoration: none; color: var(--muted); font-size: 11px; font-weight: 700; }
+  .bottom-nav a[aria-current="page"] { color: var(--brand); }
+  .bottom-nav svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .asset-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .asset-drop-btn { padding: 20px 14px; }
+}

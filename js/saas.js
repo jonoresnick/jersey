@@ -66,7 +66,6 @@
 
   /* ---------------- header ---------------- */
   function renderHeader() {
-    $('#navLibrary').hidden = !me;
     const slot = $('#authSlot');
     if (!me) {
       slot.innerHTML = '<a class="nav-login" href="#signin">Log in</a><a class="btn primary sm" href="#signup">Sign up</a>';
@@ -74,7 +73,7 @@
     }
     slot.innerHTML = `<div class="avatar-wrap"><button class="avatar" type="button" id="avatarBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">${esc(initials(me.name))}</button>` +
       `<div class="menu-pop" id="avatarMenu" hidden><div class="menu-who"><strong>${esc(me.name)}</strong><span>${esc(me.email)}</span></div>` +
-      `<a href="#library">Library</a><a href="#team">Team${activeWs() ? ` · ${esc(activeWs().name)}` : ''}</a><a href="#account">Account</a><button type="button" id="logoutBtn">Log out</button></div></div>`;
+      `${activeWs() ? `<span class="menu-team">${esc(activeWs().name)} · ${ROLE[activeWs().role]}</span>` : ''}<a href="#account">Account</a><button type="button" id="logoutBtn">Log out</button></div></div>`;
   }
   document.addEventListener('click', async (e) => {
     const btn = e.target.closest('#avatarBtn'), menu = $('#avatarMenu');
@@ -84,15 +83,17 @@
   });
 
   /* ---------------- routes ---------------- */
+  let curRoute = '';
   function route(r, param) {
+    curRoute = r;
     renderHeader();
     if (r === 'design') refreshSaveBar();
     if (r === 'signin' || r === 'signup') return renderAuth(r);
-    if (['library', 'team', 'account'].includes(r) && !me) {
+    if (['saved', 'assets', 'account'].includes(r) && !me) {
       pendingAfter = '#' + r; A().go('#signin'); return;
     }
-    if (r === 'library') renderLibrary();
-    if (r === 'team') renderTeam();
+    if (r === 'saved') renderLibrary();
+    if (r === 'assets') renderAssets();
     if (r === 'account') renderAccount();
     if (r === 'view') renderView(param);
   }
@@ -127,7 +128,7 @@
       `<p class="lede narrow">${up ? 'Save designs, work with your team and share private reveal links.' : 'Welcome back.'}</p>` + authForm(mode) +
       `<p class="switch">${up ? 'Already have an account? <a href="#signin">Log in</a>' : 'New here? <a href="#signup">Create an account</a>'}</p>`;
     mountAuth($('#authBox'), mode, () => {
-      const go = pendingAfter || '#library'; pendingAfter = null;
+      const go = pendingAfter || '#home'; pendingAfter = null;
       A().toast(up ? 'Welcome to Digital Jersey' : 'Logged in');
       A().go(go);
     });
@@ -148,7 +149,7 @@
     nameEl.placeholder = defaultName();
     const ws = activeWs();
     const btn = $('#saveBtn');
-    if (!me) status.textContent = 'Log in to save designs to your library.';
+    if (!me) status.textContent = 'Log in to save designs to your team.';
     else if (current && A().design && current.savedHash === designHash()) status.textContent = `Saved to ${(spaces.find((w) => w.id === current.wsId) || {}).name || 'your library'} · ${ago(current.savedAt)}`;
     else if (current) status.textContent = 'Unsaved changes.';
     else status.textContent = `Not saved yet. It will go to ${ws ? ws.name : 'your library'}.`;
@@ -187,20 +188,20 @@
   let libFolder = '', libQuery = '';
   async function renderLibrary() {
     const box = $('#libraryBox'), ws = activeWs();
-    if (!ws) { box.innerHTML = '<h1 class="step-title wide" id="libTitle">Library</h1><p class="lede narrow">You’re not on a team yet.</p>'; return; }
+    if (!ws) { box.innerHTML = '<h1 class="step-title wide" id="libTitle">Saved designs</h1><p class="lede narrow">You’re not on a team yet.</p>'; return; }
     const list = await run(() => api().projects(ws.id)) || [];
     const folders = [...new Set(list.map((p) => p.folder).filter(Boolean))].sort();
     if (libFolder && !folders.includes(libFolder)) libFolder = '';
     const shown = list.filter((p) => (!libFolder || p.folder === libFolder) && (!libQuery || p.name.toLowerCase().includes(libQuery.toLowerCase())));
     const edit = api().can(ws.role, 'edit');
     box.innerHTML =
-      `<div class="page-head"><div><h1 class="step-title wide" id="libTitle">Library</h1><p class="hint">${esc(ws.name)} · ${ROLE[ws.role]}${edit ? '' : ' · view only'}</p></div>` +
+      `<div class="page-head"><div><h1 class="step-title wide" id="libTitle">Saved designs</h1><p class="hint">${esc(ws.name)} · ${ROLE[ws.role]}${edit ? '' : ' · view only'}</p></div>` +
       `<div class="head-tools">${spaces.length > 1 ? `<select class="select" id="wsSelect" aria-label="Team">${spaces.map((w) => `<option value="${w.id}"${w.id === ws.id ? ' selected' : ''}>${esc(w.name)}</option>`).join('')}</select>` : ''}` +
       `${edit ? '<button class="btn primary" id="newDesign" type="button">New design</button>' : ''}</div></div>` +
       (list.length > 1 || libQuery ? `<div class="lib-tools"><input class="text-input search" id="libSearch" type="search" placeholder="Search designs" value="${esc(libQuery)}" aria-label="Search designs">` +
         `${folders.length ? `<div class="pills small" role="radiogroup" aria-label="Folder"><button class="pill" type="button" role="radio" data-folder="" aria-checked="${!libFolder}">All</button>${folders.map((f) => `<button class="pill" type="button" role="radio" data-folder="${esc(f)}" aria-checked="${libFolder === f}">${esc(f)}</button>`).join('')}</div>` : ''}</div>` : '') +
       (shown.length ? `<div class="cards">${shown.map((p) => cardHtml(p, edit)).join('')}</div>`
-        : `<div class="empty"><h2>${list.length ? 'Nothing matches' : 'No designs yet'}</h2><p class="hint">${list.length ? 'Try a different search or folder.' : 'Start a design and press “Save to library”. It’s kept here with every version.'}</p>${edit && !list.length ? '<button class="btn primary lg" id="newDesign2" type="button">Start your first design</button>' : ''}</div>`);
+        : `<div class="empty"><h2>${list.length ? 'Nothing matches' : 'No designs yet'}</h2><p class="hint">${list.length ? 'Try a different search or folder.' : 'Build a design on the Home tab and press “Save to library”. It’s kept here with every version.'}</p>${edit && !list.length ? '<button class="btn primary lg" id="newDesign2" type="button">Start your first design</button>' : ''}</div>`);
   }
   const cardHtml = (p, edit) =>
     `<div class="card lib-card" data-id="${p.id}"><button class="card-img" type="button" data-open="${p.id}" aria-label="Open ${esc(p.name)}">${p.thumb ? `<img src="${p.thumb}" alt="">` : ''}</button>` +
@@ -250,7 +251,11 @@
     const f = t.closest('[data-folder]');
     if (f) { libFolder = f.dataset.folder; renderLibrary(); }
   });
-  document.addEventListener('change', (e) => { if (e.target.id === 'wsSelect') { setActiveWs(e.target.value); libFolder = ''; renderLibrary(); renderHeader(); } });
+  document.addEventListener('change', (e) => {
+    if (e.target.id !== 'wsSelect') return;
+    setActiveWs(e.target.value); libFolder = ''; assetKind = 'all'; renderHeader();
+    if (curRoute === 'saved') renderLibrary(); if (curRoute === 'assets') renderAssets(); if (curRoute === 'account') renderTeam();
+  });
   document.addEventListener('input', (e) => { if (e.target.id === 'libSearch') { libQuery = e.target.value; clearTimeout(renderLibrary.t); renderLibrary.t = setTimeout(async () => { await renderLibrary(); const s = $('#libSearch'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }, 200); } });
 
   async function versionsDialog(id) {
@@ -262,32 +267,25 @@
     $('#modalBody').onclick = (e) => { const b = e.target.closest('[data-ver]'); if (b) { A().closeModal(); openProject(id, b.dataset.ver); } };
   }
 
-  /* ---------------- team ---------------- */
+  /* ---------------- team (a section of Account) ---------------- */
   async function renderTeam() {
     const box = $('#teamBox'), ws = activeWs();
-    if (!ws) return;
-    const owner = ws.role === 'owner', edit = api().can(ws.role, 'edit');
-    const [members, brand] = await Promise.all([run(() => api().members(ws.id)), run(() => api().brand(ws.id))]);
-    const b = brand || { palette: A().design.team.palette.slice(), teamName: A().design.team.name, crest: null, sponsor: null };
+    if (!box) return;
+    if (!ws) { box.innerHTML = ''; return; }
+    const owner = ws.role === 'owner';
+    const members = await run(() => api().members(ws.id));
     box.innerHTML =
-      `<div class="page-head"><div><h1 class="step-title wide" id="teamTitle">Team</h1><p class="hint">Your role: ${ROLE[ws.role]}</p></div><div class="head-tools">` +
-      `<select class="select" id="wsSelect" aria-label="Team">${spaces.map((w) => `<option value="${w.id}"${w.id === ws.id ? ' selected' : ''}>${esc(w.name)}</option>`).join('')}</select><button class="btn" id="newTeam" type="button">New team</button></div></div>` +
-      `<div class="two-col"><div>` +
-      `<h2 class="section-title sm">Team name</h2><div class="inline-form"><input class="text-input wide" id="teamName" value="${esc(ws.name)}" maxlength="40"${owner ? '' : ' disabled'}>${owner ? '<button class="btn" id="renameTeam" type="button">Rename</button>' : ''}</div>` +
-      `<h2 class="section-title sm">Members</h2><div class="members">${(members || []).map((m) =>
+      `<h2 class="section-title sm">Team</h2><div class="inline-form"><select class="select" id="wsSelect" aria-label="Team">${spaces.map((w) => `<option value="${w.id}"${w.id === ws.id ? ' selected' : ''}>${esc(w.name)}</option>`).join('')}</select><button class="btn" id="newTeam" type="button">New team</button></div>` +
+      `<p class="hint">Your role: ${ROLE[ws.role]}. Saved designs and assets belong to the team, so everyone on it shares them.</p>` +
+      `<div class="inline-form"><input class="text-input wide" id="teamName" value="${esc(ws.name)}" maxlength="40" aria-label="Team name"${owner ? '' : ' disabled'}>${owner ? '<button class="btn" id="renameTeam" type="button">Rename</button>' : ''}</div>` +
+      `<h3 class="sub-label">Members</h3><div class="members">${(members || []).map((m) =>
         `<div class="member"><span class="avatar sm">${esc(initials(m.name))}</span><div class="member-who"><strong>${esc(m.name)}${m.userId === me.id ? ' (you)' : ''}</strong><span>${esc(m.email)}${m.status === 'invited' ? ` · invited · code <b class="code">${esc(m.code || '')}</b>` : ''}</span></div>` +
         (owner && m.role !== 'owner' ? `<select class="select sm" data-role="${esc(m.userId)}" aria-label="Role for ${esc(m.name)}"><option value="editor"${m.role === 'editor' ? ' selected' : ''}>Editor</option><option value="viewer"${m.role === 'viewer' ? ' selected' : ''}>Viewer</option></select><button class="link danger" type="button" data-remove="${esc(m.userId)}">Remove</button>` : `<span class="role-tag">${ROLE[m.role]}</span>`) + '</div>').join('')}</div>` +
-      (owner ? `<h2 class="section-title sm">Invite someone</h2><div class="inline-form"><input class="text-input wide" id="invEmail" type="email" placeholder="name@team.com" aria-label="Email to invite"><select class="select" id="invRole" aria-label="Role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button class="btn primary" id="inviteBtn" type="button">Invite</button></div>` +
-        '<p class="hint">Editors can create and change designs. Viewers can only look. You’ll get an invite code to send them; they sign up with that email and enter the code under “Join a team”.</p>' : '') +
+      (owner ? `<h3 class="sub-label">Invite someone</h3><div class="inline-form"><input class="text-input wide" id="invEmail" type="email" placeholder="name@team.com" aria-label="Email to invite"><select class="select" id="invRole" aria-label="Role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button class="btn primary" id="inviteBtn" type="button">Invite</button></div>` +
+        '<p class="hint">Editors can create and change designs and assets. Viewers can only look. You’ll get an invite code to send them; they sign up with that email and enter the code under “Join a team”.</p>' : '') +
       '<p class="form-error" id="teamError" role="alert" hidden></p>' +
-      `<h2 class="section-title sm">Join a team</h2><div class="inline-form"><input class="text-input wide" id="joinCode" placeholder="Invite code" aria-label="Invite code"><button class="btn" id="joinBtn" type="button">Join</button></div>` +
-      `</div><div><h2 class="section-title sm">Brand kit</h2><p class="hint first">New designs from your Library start with these colours and logos.</p>` +
-      `<div class="brand-sw">${b.palette.map((c, i) => `<label class="team-sw" style="--c:${c}"><span></span>${UB.PALETTE_SLOTS[i]}<input type="color" value="${c}" data-brand-slot="${i}"${edit ? '' : ' disabled'}></label>`).join('')}</div>` +
-      `<label class="field"><span>Team name on designs</span><input class="text-input wide" id="brandName" value="${esc(b.teamName || '')}" maxlength="40"${edit ? '' : ' disabled'}></label>` +
-      `<div class="drops brand-drops">${['crest', 'sponsor'].map((k) => `<div class="drop${b[k] ? ' has-image' : ''}" data-brand-logo="${k}"><button class="drop-box" type="button" data-brand-pick="${k}"${edit ? '' : ' disabled'}>${b[k] ? `<img src="${b[k]}" alt="">` : '<span><small>Upload</small></span>'}</button><div class="drop-meta"><strong>${k === 'crest' ? 'Crest' : 'Sponsor'}</strong></div></div>`).join('')}</div>` +
-      (edit ? '<div class="inline-form"><button class="btn primary" id="saveBrand" type="button">Save brand kit</button><button class="btn" id="applyBrand" type="button">Use on the open design</button></div>' : '') +
-      `<h2 class="section-title sm">${owner ? 'Danger zone' : 'Leave'}</h2>${owner ? '<button class="btn danger-btn" id="delTeam" type="button">Delete this team</button>' : '<button class="btn danger-btn" id="leaveTeam" type="button">Leave this team</button>'}</div></div><input type="file" id="brandFile" accept="image/*" hidden>`;
-    box._brand = { palette: b.palette.slice(), crest: b.crest, sponsor: b.sponsor };
+      `<h3 class="sub-label">Join a team</h3><div class="inline-form"><input class="text-input wide" id="joinCode" placeholder="Invite code" aria-label="Invite code"><button class="btn" id="joinBtn" type="button">Join</button></div>` +
+      `<div class="inline-form team-danger">${owner ? '<button class="btn danger-btn" id="delTeam" type="button">Delete this team</button>' : '<button class="btn danger-btn" id="leaveTeam" type="button">Leave this team</button>'}</div>`;
   }
   document.addEventListener('click', async (e) => {
     const t = e.target, box = t.closest('#teamBox');
@@ -299,39 +297,127 @@
     if (t.closest('#inviteBtn')) {
       await run(async () => {
         const { code } = await api().invite(ws.id, $('#invEmail').value, $('#invRole').value);
-        A().openModal('Invite created', `<p>Send this code to <b>${esc($('#invEmail').value)}</b>:</p><p class="code-big">${esc(code)}</p><p class="hint">They create an account with that email, open Team, and enter the code under “Join a team”.</p>`, [{ label: 'Copy code', primary: true, run: () => { copyText(code, 'Code copied'); return false; } }]);
+        A().openModal('Invite created', `<p>Send this code to <b>${esc($('#invEmail').value)}</b>:</p><p class="code-big">${esc(code)}</p><p class="hint">They create an account with that email, open Account, and enter the code under “Join a team”.</p>`, [{ label: 'Copy code', primary: true, run: () => { copyText(code, 'Code copied'); return false; } }]);
         renderTeam();
       }, err); return;
     }
     if (t.closest('#joinBtn')) { await run(async () => { const n = await api().joinWithCode($('#joinCode').value); await refresh(); A().toast(`You joined ${n}`); renderTeam(); }, err); return; }
     const rm = t.closest('[data-remove]');
     if (rm) { await run(async () => { await api().removeMember(ws.id, rm.dataset.remove); renderTeam(); }, err); return; }
-    const pick = t.closest('[data-brand-pick]');
-    if (pick) { box._pick = pick.dataset.brandPick; $('#brandFile').click(); return; }
-    if (t.closest('#saveBrand')) {
-      await run(async () => { await api().setBrand(ws.id, { ...box._brand, teamName: $('#brandName').value }); A().toast('Brand kit saved'); }, err); return;
-    }
-    if (t.closest('#applyBrand')) {
-      const d = JSON.parse(JSON.stringify(A().design));
-      d.team.palette = box._brand.palette.slice(); if ($('#brandName').value) d.team.name = $('#brandName').value;
-      if (box._brand.crest) { d.crest.image = box._brand.crest; d.crest.style = 'image'; }
-      if (box._brand.sponsor) d.photoLogos = { ...(d.photoLogos || {}), sponsor: box._brand.sponsor };
-      A().setDesign(d); A().toast('Applied to the open design'); return;
-    }
-    if (t.closest('#delTeam')) return A().openModal('Delete this team?', `<p>“${esc(ws.name)}” and all of its designs will be deleted for every member. This can’t be undone.</p>`, [{ label: 'Delete team', primary: true, run: () => { run(async () => { await api().deleteWorkspace(ws.id); await refresh(); A().closeModal(); renderTeam(); }, err); return false; } }]);
+    if (t.closest('#delTeam')) return A().openModal('Delete this team?', `<p>“${esc(ws.name)}” and all of its designs and assets will be deleted for every member. This can’t be undone.</p>`, [{ label: 'Delete team', primary: true, run: () => { run(async () => { await api().deleteWorkspace(ws.id); await refresh(); A().closeModal(); renderTeam(); }, err); return false; } }]);
     if (t.closest('#leaveTeam')) { await run(async () => { await api().leaveWorkspace(ws.id); await refresh(); renderTeam(); A().toast('You left the team'); }, err); }
   });
   document.addEventListener('change', async (e) => {
-    const box = $('#teamBox');
-    if (!box || !e.target.closest('#teamBox')) return;
-    const ws = activeWs();
-    if (e.target.dataset.role) await run(async () => { await api().setRole(ws.id, e.target.dataset.role, e.target.value); }, $('#teamError'));
-    if (e.target.dataset.brandSlot !== undefined) { const i = +e.target.dataset.brandSlot; box._brand.palette[i] = e.target.value; e.target.closest('.team-sw').style.setProperty('--c', e.target.value); }
-    if (e.target.id === 'brandFile' && e.target.files[0]) {
-      const f = e.target.files[0]; e.target.value = '';
-      const fr = new FileReader();
-      fr.onload = () => { const k = box._pick; box._brand[k] = fr.result; const b = $(`[data-brand-pick="${k}"]`); b.innerHTML = `<img src="${fr.result}" alt="">`; };
-      fr.readAsDataURL(f);
+    if (!e.target.closest('#teamBox')) return;
+    if (e.target.dataset.role) await run(async () => { await api().setRole(activeWs().id, e.target.dataset.role, e.target.value); }, $('#teamError'));
+  });
+
+  /* ---------------- assets (shared by the whole team) ---------------- */
+  const KINDS = { crest: 'Crest', sponsor: 'Sponsor', patch: 'Patch', other: 'Other' };
+  const SLOT_FOR_USE = [['crest', 'Chest crest'], ['sponsor', 'Sponsor'], ['captain', 'Captaincy patch'], ['shoulders', 'Shoulder patches'], ['neck', 'Collar'], ['pantsL', 'Left pants leg'], ['pantsR', 'Right pants leg']];
+  const KIND_FOR_SLOT = { crest: 'crest', sponsor: 'sponsor', captain: 'patch', shoulders: 'patch' };
+  let assetKind = 'all', uploadKind = 'other', assetCache = [];
+  async function renderAssets() {
+    const box = $('#assetsBox'), ws = activeWs();
+    if (!ws) { box.innerHTML = ''; return; }
+    const edit = api().can(ws.role, 'edit');
+    const list = (await run(() => api().assets(ws.id))) || [];
+    const brand = await run(() => api().brand(ws.id));
+    assetCache = list;
+    const counts = Object.fromEntries(Object.keys(KINDS).map((k) => [k, list.filter((a) => a.kind === k).length]));
+    const shown = list.filter((a) => assetKind === 'all' || a.kind === assetKind);
+    const b = brand || { palette: A().design.team.palette.slice(), teamName: A().design.team.name, crest: null, sponsor: null };
+    const opts = (cur) => '<option value="">None</option>' + list.map((a) => `<option value="${a.id}"${a.image && a.image === cur ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+    box.innerHTML =
+      `<div class="page-head"><div><h1 class="step-title wide" id="assetsTitle">Assets</h1><p class="hint">${esc(ws.name)} · shared with everyone on the team${edit ? '' : ' · view only'}</p></div>` +
+      `<div class="head-tools">${spaces.length > 1 ? `<select class="select" id="wsSelect" aria-label="Team">${spaces.map((w) => `<option value="${w.id}"${w.id === ws.id ? ' selected' : ''}>${esc(w.name)}</option>`).join('')}</select>` : ''}</div></div>` +
+      (edit ? `<div class="asset-drop" id="assetDrop"><button type="button" id="assetPick" class="asset-drop-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg><strong>Drop logos here, or click to upload</strong><span>Crests, sponsors, patches and any other image. PNGs with a transparent background work best; plain-background JPGs get a clean-up step.</span></button>` +
+        `<label class="asset-kind">Add as <select class="select sm" id="assetKind" aria-label="Type">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${(uploadKind === k) ? ' selected' : ''}>${v}</option>`).join('')}</select></label></div><input type="file" id="assetFile" accept="image/*" multiple hidden>` : '') +
+      `<div class="lib-tools"><div class="pills small" role="radiogroup" aria-label="Type"><button class="pill" type="button" role="radio" data-afilter="all" aria-checked="${assetKind === 'all'}">All ${list.length}</button>${Object.entries(KINDS).map(([k, v]) => `<button class="pill" type="button" role="radio" data-afilter="${k}" aria-checked="${assetKind === k}">${v} ${counts[k]}</button>`).join('')}</div></div>` +
+      (shown.length ? `<div class="cards asset-grid">${shown.map((a) => `<div class="card asset-card" data-asset="${a.id}"><div class="asset-img"><img src="${a.image || ''}" alt="${esc(a.name)}"></div><div class="card-meta"><strong>${esc(a.name)}</strong><span>${KINDS[a.kind]} · ${ago(a.created)}${a.byName ? ' · ' + esc(a.byName) : ''}</span></div>` +
+        `<div class="card-actions"><button class="link" type="button" data-use="${a.id}">Use in design</button>${edit ? `<details class="more"><summary>More</summary><div class="menu-pop"><button type="button" data-aren="${a.id}">Rename</button><button type="button" data-akind="${a.id}">Change type</button><button type="button" class="danger" data-adel="${a.id}">Delete</button></div></details>` : ''}</div></div>`).join('')}</div>`
+        : `<div class="empty"><h2>${list.length ? 'Nothing of that type yet' : 'No assets yet'}</h2><p class="hint">${edit ? 'Upload your team’s logos above. They’re then one click away on the Home tab.' : 'Ask an editor or the owner to upload some.'}</p></div>`) +
+      `<h2 class="section-title sm brand-title">Brand colours and defaults</h2><p class="hint first">New designs start with these. Change them once and every new design follows.</p>` +
+      `<div class="brand-sw" id="brandSw">${b.palette.map((c, i) => `<label class="team-sw" style="--c:${c}"><span></span>${UB.PALETTE_SLOTS[i]}<input type="color" value="${c}" data-brand-slot="${i}"${edit ? '' : ' disabled'}></label>`).join('')}</div>` +
+      `<div class="field-row brand-fields"><label class="field"><span>Team name on designs</span><input class="text-input wide" id="brandName" value="${esc(b.teamName || '')}" maxlength="40"${edit ? '' : ' disabled'}></label>` +
+      `<label class="field"><span>Default crest</span><select class="select" id="brandCrest"${edit ? '' : ' disabled'}>${opts(b.crest)}</select></label><label class="field"><span>Default sponsor</span><select class="select" id="brandSponsor"${edit ? '' : ' disabled'}>${opts(b.sponsor)}</select></label></div>` +
+      (edit ? '<div class="inline-form"><button class="btn primary" id="saveBrand" type="button">Save brand colours</button><button class="btn" id="applyBrand" type="button">Use on the open design</button></div>' : '');
+    box._palette = b.palette.slice();
+  }
+  const assetById = (id) => assetCache.find((a) => a.id === id);
+  async function addFiles(files) {
+    const ws = activeWs(), kind = ($('#assetKind') || {}).value || 'other';
+    let n = 0;
+    for (const f of files) {
+      const img = await run(() => A().prepareImage(f));
+      if (!img) continue;
+      const ok = await run(() => api().addAsset({ wsId: ws.id, name: f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), kind, image: img }));
+      if (ok) n++;
+    }
+    if (n) { A().toast(`${n} asset${n === 1 ? '' : 's'} added`); renderAssets(); }
+  }
+  document.addEventListener('click', async (e) => {
+    const t = e.target, box = t.closest('#assetsBox');
+    if (!box) return;
+    const ws = activeWs(), id = (a) => { const el = t.closest(`[data-${a}]`); return el && el.dataset[a]; };
+    if (t.closest('#assetPick')) { $('#assetFile').click(); return; }
+    const af = t.closest('[data-afilter]');
+    if (af) { assetKind = af.dataset.afilter; if (assetKind !== 'all') uploadKind = assetKind; renderAssets(); return; }
+    if (id('use')) {
+      const a = assetById(id('use'));
+      A().openModal(`Use “${esc(a.name)}” in the design`, `<p class="hint first">Where should it go?</p><div class="pills">${SLOT_FOR_USE.map(([k, l]) => `<button class="pill" type="button" data-slot-use="${k}">${l}</button>`).join('')}</div>`, []);
+      $('#modalBody').onclick = (ev) => { const b = ev.target.closest('[data-slot-use]'); if (!b) return; A().setLogo(b.dataset.slotUse, a.image); A().closeModal(); A().go('#home'); A().toast(`Added to ${A().slotLabel(b.dataset.slotUse).toLowerCase()}`); };
+      return;
+    }
+    if (id('aren')) { const a = assetById(id('aren')); return promptModal('Rename asset', 'Name', a.name, 'Rename', async (v) => { await api().updateAsset(a.id, { name: v }); renderAssets(); }); }
+    if (id('akind')) {
+      const a = assetById(id('akind'));
+      return A().openModal('Change type', `<label class="field"><span>Type</span><select class="select" id="kindSel">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${a.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`, [{ label: 'Save', primary: true, run: () => { run(async () => { await api().updateAsset(a.id, { kind: $('#kindSel').value }); A().closeModal(); renderAssets(); }); return false; } }]);
+    }
+    if (id('adel')) {
+      const a = assetById(id('adel'));
+      return A().openModal('Delete this asset?', `<p>“${esc(a.name)}” will be removed for everyone on the team. Designs that already use it keep their copy.</p>`, [{ label: 'Delete', primary: true, run: () => { run(async () => { await api().deleteAsset(a.id); A().closeModal(); renderAssets(); }); return false; } }]);
+    }
+    if (t.closest('#saveBrand') || t.closest('#applyBrand')) {
+      const brand = { palette: box._palette, teamName: $('#brandName').value, crest: (assetById($('#brandCrest').value) || {}).image || null, sponsor: (assetById($('#brandSponsor').value) || {}).image || null };
+      if (t.closest('#saveBrand')) { await run(async () => { await api().setBrand(ws.id, brand); A().toast('Brand colours saved'); }); return; }
+      const d = JSON.parse(JSON.stringify(A().design));
+      d.team.palette = brand.palette.slice(); if (brand.teamName) d.team.name = brand.teamName;
+      if (brand.crest) { d.crest.image = brand.crest; d.crest.style = 'image'; }
+      if (brand.sponsor) d.photoLogos = { ...(d.photoLogos || {}), sponsor: brand.sponsor };
+      A().setDesign(d); A().toast('Applied to the open design'); A().go('#home');
+    }
+  });
+  document.addEventListener('change', (e) => {
+    const box = e.target.closest('#assetsBox');
+    if (!box) return;
+    if (e.target.id === 'assetKind') uploadKind = e.target.value;
+    if (e.target.id === 'assetFile' && e.target.files.length) { const files = [...e.target.files]; e.target.value = ''; addFiles(files); }
+    if (e.target.dataset.brandSlot !== undefined) { box._palette[+e.target.dataset.brandSlot] = e.target.value; e.target.closest('.team-sw').style.setProperty('--c', e.target.value); }
+  });
+  document.addEventListener('dragover', (e) => { const z = e.target.closest('#assetDrop'); if (z) { e.preventDefault(); z.classList.add('is-over'); } });
+  document.addEventListener('dragleave', (e) => { const z = e.target.closest('#assetDrop'); if (z && !z.contains(e.relatedTarget)) z.classList.remove('is-over'); });
+  document.addEventListener('drop', (e) => { const z = e.target.closest('#assetDrop'); if (!z) return; e.preventDefault(); z.classList.remove('is-over'); addFiles([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'))); });
+
+  /* The designer's logo boxes: pick from the team's assets, or save an upload to them. */
+  document.addEventListener('click', async (e) => {
+    const box = e.target.closest('#drops .drop');
+    if (!box) return;
+    const slot = box.dataset.drop;
+    if (e.target.closest('[data-asset-pick]')) {
+      if (!me) return authModal('signup', () => {});
+      const ws = activeWs();
+      const list = (await run(() => api().assets(ws.id))) || [];
+      A().openModal('Choose from your assets', list.length
+        ? `<div class="asset-picker">${list.map((a) => `<button class="asset-pick-item" type="button" data-pick-asset="${a.id}"><span class="asset-img"><img src="${a.image || ''}" alt=""></span><span>${esc(a.name)}</span></button>`).join('')}</div>`
+        : '<p>There’s nothing here yet. <a href="#assets">Upload your team’s logos on the Assets tab</a>.</p>', []);
+      $('#modalBody').onclick = (ev) => { const b = ev.target.closest('[data-pick-asset]'); if (!b) { if (ev.target.closest('a')) A().closeModal(); return; } const a = list.find((x) => x.id === b.dataset.pickAsset); A().setLogo(slot, a.image); A().closeModal(); A().toast(`${a.name} added`); };
+    }
+    if (e.target.closest('[data-asset-save]')) {
+      if (!me) return authModal('signup', () => {});
+      const ws = activeWs(), img = A().getLogo(slot);
+      if (!ws || !api().can(ws.role, 'edit')) return A().toast('Only editors and owners can add assets.');
+      promptModal('Save to assets', 'Name', A().slotLabel(slot), 'Save', async (v) => { await api().addAsset({ wsId: ws.id, name: v, kind: KIND_FOR_SLOT[slot] || 'other', image: img }); A().toast('Saved to assets'); });
     }
   });
 
@@ -339,9 +425,11 @@
   function renderAccount() {
     $('#accountBox').innerHTML = `<h1 class="step-title wide" id="accTitle">Account</h1><p class="hint demo first">${DEMO}</p>` +
       `<h2 class="section-title sm">Profile</h2><form id="profileForm" class="stack"><label class="field"><span>Name</span><input class="text-input full" name="name" value="${esc(me.name)}" required></label><label class="field"><span>Email</span><input class="text-input full" value="${esc(me.email)}" disabled></label><p class="form-error" hidden></p><button class="btn primary" type="submit">Save</button></form>` +
+      `<div id="teamBox"></div>` +
       `<h2 class="section-title sm">Change password</h2><form id="pwForm" class="stack"><label class="field"><span>Current password</span><input class="text-input full" name="current" type="password" autocomplete="current-password" required></label><label class="field"><span>New password</span><input class="text-input full" name="next" type="password" autocomplete="new-password" minlength="8" required></label><p class="form-error" hidden></p><button class="btn" type="submit">Change password</button></form>` +
       `<h2 class="section-title sm">Your data</h2><div class="inline-form"><button class="btn" id="exportData" type="button">Download my data</button><button class="btn" id="logout2" type="button">Log out</button></div>` +
-      `<h2 class="section-title sm">Delete account</h2><p class="hint first">Removes your account and any team you own, with its designs.</p><button class="btn danger-btn" id="delAccount" type="button">Delete my account</button>`;
+      `<h2 class="section-title sm">Delete account</h2><p class="hint first">Removes your account and any team you own, with its designs and assets.</p><button class="btn danger-btn" id="delAccount" type="button">Delete my account</button>`;
+    renderTeam();
   }
   document.addEventListener('submit', async (e) => {
     const f = e.target;
