@@ -124,7 +124,10 @@
     running = true;
     do {
       dirty = false;
-      if (route === 'design' && side === 'front') await paintPhoto(state, kit(), $('#photoCanvas'));
+      if (route === 'design' && side === 'front') {
+        const studio = wide() && (!state.view || state.view.scene === 'photo');
+        await paintPhoto(studio ? { ...state, view: { ...state.view, scene: 'clear' } } : state, kit(), $('#photoCanvas'));
+      }
     } while (dirty);
     running = false;
   }
@@ -142,8 +145,21 @@
       renderTemplates();
       renderTeamColours();
       renderZones();
+      renderOutliner();
     }
     pump();
+  }
+
+  /* ---------------- outliner and viewport labels ---------------- */
+  const OUTLINE = [['body', 'Jersey'], ['sleeves', 'Sleeves'], ['stripe1', 'Main stripe'], ['stripe2', 'Accent stripe'], ['collar', 'Collar'],
+    ['number', 'Numbers'], ['pants', 'Pants'], ['socks', 'Socks'], ['gloves', 'Gloves'], ['helmet', 'Helmet']];
+  function renderOutliner() {
+    const k = kit(), tpl = UB.TEMPLATES.find((t) => t.id === k.template);
+    $('#olKit').textContent = `${UB.KIT_NAMES[state.active]} · ${k.swap ? 'Light' : 'Dark'}`;
+    $('#olList').innerHTML = OUTLINE.map(([z, l]) =>
+      `<button class="zone-row ol-row" type="button" data-zone="${z}"><i style="background:${UB.color(state, k, z)}"></i><b>${l}</b><span>${esc(slotLabel(UB.zoneValue(k, z)))}</span></button>`).join('');
+    $('#vpView').textContent = side === 'back' ? 'Back view' : 'Front view';
+    $('#vpWhat').textContent = `${state.team.name || 'My team'} | ${UB.KIT_NAMES[state.active]} · ${tpl ? tpl.name : ''}`;
   }
 
   /* ---------------- controls ---------------- */
@@ -673,6 +689,7 @@
     layer.style.transition = animate ? 'transform 0.18s ease' : 'none';
     layer.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
     $('#zoomReset').hidden = view.s <= 1.01;
+    const vz = $('#vpZoom'); if (vz) vz.textContent = Math.round(view.s * 100) + '%';
   }
   function clampView() {
     const r = $('#previewCard').getBoundingClientRect(), maxX = (r.width * (view.s - 1)) / 2, maxY = (r.height * (view.s - 1)) / 2;
@@ -732,6 +749,18 @@
     }, { passive: false });
     card.addEventListener('dblclick', () => { if (view.s > 1.01) resetView(true); else { view.s = 2; applyView(true); } });
     $('#zoomReset').addEventListener('click', () => resetView(true));
+    $('#vTools').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-vt]'); if (!b) return;
+      const t = b.dataset.vt;
+      if (t === 'zin') { view.s = Math.min(4, view.s * 1.25); clampView(); applyView(true); }
+      if (t === 'zout') { view.s = Math.max(1, view.s / 1.25); clampView(); applyView(true); }
+      if (t === 'fit') resetView(true);
+      if ((t === 'front' && side === 'back') || (t === 'back' && side === 'front')) flipSide();
+      if (t === 'undo') undo();
+      if (t === 'redo') redo();
+      if (t === 'select') toast('Click any part of the player to change its colour.');
+      $$('#vTools [data-vt="front"], #vTools [data-vt="back"]').forEach((x) => x.classList.toggle('on', x.dataset.vt === side));
+    });
   }
 
   /* ---------------- boot ---------------- */

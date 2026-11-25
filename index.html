@@ -53,18 +53,35 @@
               <button class="pill" type="button" role="radio" data-side="back" aria-checked="false">Back</button>
             </div>
             <button class="zoom-reset" id="zoomReset" type="button" hidden>Reset zoom</button>
+            <div class="vp-grid" aria-hidden="true"><i></i></div>
+            <div class="vp-info" aria-hidden="true"><b id="vpView">Front view</b><span id="vpWhat"></span></div>
+            <div class="vp-gizmo" aria-hidden="true"><span class="gz-z">Z</span><span class="gz-y">Y</span><span class="gz-x">X</span></div>
+            <div class="vp-zoom" id="vpZoom" aria-hidden="true">100%</div>
           </div>
           <div class="preview-foot">
             <p class="hint" id="previewHint">Click any part to change its colour.</p>
           </div>
+          <div class="vtools" id="vTools" role="toolbar" aria-label="View tools">
+            <button class="vt" type="button" data-vt="select" title="Select a part to colour it" aria-label="Select a part to colour it"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l11 6.5-5 1.3-2.2 5z"/></svg></button>
+            <button class="vt" type="button" data-vt="zin" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5M8 10.5h5M10.5 8v5"/></svg></button>
+            <button class="vt" type="button" data-vt="zout" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5M8 10.5h5"/></svg></button>
+            <button class="vt" type="button" data-vt="fit" title="Frame the player" aria-label="Frame the player"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+            <span class="vt-sep"></span>
+            <button class="vt" type="button" data-vt="front" title="Front view" aria-label="Front view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l3 4-2.5 1.5V20h-9V9.5L5 8z"/></svg></button>
+            <button class="vt" type="button" data-vt="back" title="Back view" aria-label="Back view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l3 4-2.5 1.5V20h-9V9.5L5 8z"/><path d="M12 9v7"/></svg></button>
+            <span class="vt-sep"></span>
+            <button class="vt" type="button" data-vt="undo" title="Undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6 4 10l4 4"/><path d="M4.5 10H14a5 5 0 0 1 0 10h-2"/></svg></button>
+            <button class="vt" type="button" data-vt="redo" title="Redo" aria-label="Redo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 6 4 4-4 4"/><path d="M19.5 10H10a5 5 0 0 0 0 10h2"/></svg></button>
+          </div>
+          <div class="outliner" id="outliner"><div class="ol-head"><span>Uniform</span><small id="olKit"></small></div><div class="ol-list" id="olList"></div></div>
           <div class="dock" id="dock"></div>
           <div class="tabbar" id="tabbar" role="tablist" aria-label="Design sections">
-            <button type="button" role="tab" data-tabbtn="style" aria-selected="true">Style</button>
-            <button type="button" role="tab" data-tabbtn="stripes" aria-selected="false">Stripes</button>
-            <button type="button" role="tab" data-tabbtn="text" aria-selected="false">Text &amp; logos</button>
-            <button type="button" role="tab" data-tabbtn="kit" aria-selected="false">Pants &amp; socks</button>
-            <button type="button" role="tab" data-tabbtn="parts" aria-selected="false">Parts</button>
-            <button type="button" role="tab" data-tabbtn="share" aria-selected="false">Save &amp; share</button>
+            <button type="button" role="tab" data-tabbtn="style" aria-selected="true" title="Style"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r="1.3"/><circle cx="14.5" cy="9" r="1.3"/><circle cx="15.5" cy="14" r="1.3"/></svg><span>Style</span></button>
+            <button type="button" role="tab" data-tabbtn="stripes" aria-selected="false" title="Stripes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16"/></svg><span>Stripes</span></button>
+            <button type="button" role="tab" data-tabbtn="text" aria-selected="false" title="Text & logos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M12 6v13M9 19h6"/></svg><span>Text &amp; logos</span></button>
+            <button type="button" role="tab" data-tabbtn="kit" aria-selected="false" title="Pants & socks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10l1 7-2 9h-3l-1-7-1 7H8l-2-9z"/></svg><span>Pants &amp; socks</span></button>
+            <button type="button" role="tab" data-tabbtn="parts" aria-selected="false" title="Parts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Parts</span></button>
+            <button type="button" role="tab" data-tabbtn="share" aria-selected="false" title="Save & share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6"/></svg><span>Save &amp; share</span></button>
           </div>
         </div>
 
