@@ -4,7 +4,7 @@ Design a hockey jersey and see it on a player. Built to look and work like Digit
 
 | Tab | Route | What it is |
 | --- | --- | --- |
-| Home | `#home` | The designer. This is the landing page. |
+| Home | `#home` | The designer, laid out like a 3D studio: the player fills the screen, the options float on the right in tabs (Style, Stripes, Text & logos, Pants & socks, Parts), and a toolbar at the bottom has Save, Share, Social post and Download. This is the landing page. |
 | Explore | `#explore` | Twelve starter designs in different colour schemes |
 | Saved designs | `#saved` | Your team's saved designs, with folders, search and version history |
 | Assets | `#assets` | The team's logos (crests, sponsors, patches) and brand colours |

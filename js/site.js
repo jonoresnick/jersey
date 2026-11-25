@@ -501,6 +501,7 @@
     syncControls();
     render();
     showTab(activeTab);
+    layoutStudio();
     if (UB.saas) UB.saas.route(route, param);
   }
 
@@ -556,7 +557,7 @@
       if (tabBtn) { showTab(tabBtn.dataset.tabbtn); return; }
       if (t.closest('#aiGo')) { askAI(); return; }
       const sum = t.closest('details.opt > summary');
-      if (sum && mobile()) { e.preventDefault(); return; }
+      if (sum) { e.preventDefault(); return; }
       const kitBtn = t.closest('[data-kit]');
       if (kitBtn) { state.active = kitBtn.dataset.kit; store.write(STORE_KEY, state); syncControls(); render(); return; }
       const tpl = t.closest('[data-tpl]');
@@ -617,7 +618,7 @@
     $('#undoBtn').onclick = undo;
     $('#redoBtn').onclick = redo;
     $('#aiPrompt').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); askAI(); } });
-    addEventListener('resize', () => showTab(activeTab));
+    addEventListener('resize', () => { showTab(activeTab); layoutStudio(); });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { closePicker(); closeModal(); }
       const mod = e.metaKey || e.ctrlKey;
@@ -643,10 +644,26 @@
     activeTab = tab;
     $$('[data-tabbtn]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tabbtn === tab)));
     $$('.options .opt[data-tab]').forEach((el) => {
-      el.classList.toggle('tab-off', mobile() && el.dataset.tab !== tab);
-      if (mobile() && el.tagName === 'DETAILS') el.open = true;
+      el.classList.toggle('tab-off', el.dataset.tab !== tab);
+      if (el.tagName === 'DETAILS') el.open = true;
     });
     $('#tabbar [aria-selected="true"]').scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  /* ---------------- studio layout (wide screens) ---------------- */
+  // The picture fits the free space beside the floating panel; Save and share becomes a toolbar.
+  const wide = () => matchMedia('(min-width: 961px)').matches;
+  function layoutStudio() {
+    const box = $('#stageBox'), layer = $('#zoomLayer'), body = $('#shareBody');
+    if (!box || !body) return;
+    const target = wide() ? $('#dock') : $('#shareOpt');
+    if (body.parentElement !== target) target.append(body);
+    if (wide()) {
+      const r = layer.getBoundingClientRect();
+      if (!r.width) return;
+      const k = Math.min(r.width / 1098, r.height / 1122);
+      box.style.width = Math.floor(1098 * k) + 'px'; box.style.height = Math.floor(1122 * k) + 'px';
+    } else { box.style.width = ''; box.style.height = ''; }
   }
 
   /* ---------------- pinch, pan and swipe on the preview ---------------- */

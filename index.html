@@ -43,8 +43,10 @@
           </div>
           <div class="preview-card" id="previewCard">
             <div class="zoom-layer" id="zoomLayer">
-              <canvas id="photoCanvas" width="1098" height="1122" role="img" aria-label="A player wearing your design"></canvas>
-              <div class="back-wrap" id="backWrap" hidden></div>
+              <div class="stage-box" id="stageBox">
+                <canvas id="photoCanvas" width="1098" height="1122" role="img" aria-label="A player wearing your design"></canvas>
+                <div class="back-wrap" id="backWrap" hidden></div>
+              </div>
             </div>
             <div class="pills small side-pills" id="sidePills" role="radiogroup" aria-label="Preview side">
               <button class="pill" type="button" role="radio" data-side="front" aria-checked="true">Front</button>
@@ -55,13 +57,14 @@
           <div class="preview-foot">
             <p class="hint" id="previewHint">Click any part to change its colour.</p>
           </div>
+          <div class="dock" id="dock"></div>
           <div class="tabbar" id="tabbar" role="tablist" aria-label="Design sections">
             <button type="button" role="tab" data-tabbtn="style" aria-selected="true">Style</button>
             <button type="button" role="tab" data-tabbtn="stripes" aria-selected="false">Stripes</button>
-            <button type="button" role="tab" data-tabbtn="text" aria-selected="false">Text and logos</button>
-            <button type="button" role="tab" data-tabbtn="kit" aria-selected="false">Pants and socks</button>
-            <button type="button" role="tab" data-tabbtn="parts" aria-selected="false">Each part</button>
-            <button type="button" role="tab" data-tabbtn="share" aria-selected="false">Save and share</button>
+            <button type="button" role="tab" data-tabbtn="text" aria-selected="false">Text &amp; logos</button>
+            <button type="button" role="tab" data-tabbtn="kit" aria-selected="false">Pants &amp; socks</button>
+            <button type="button" role="tab" data-tabbtn="parts" aria-selected="false">Parts</button>
+            <button type="button" role="tab" data-tabbtn="share" aria-selected="false">Save &amp; share</button>
           </div>
         </div>
 
@@ -190,6 +193,7 @@
 
           <div class="opt" data-tab="share" id="shareOpt">
             <h2 class="opt-title">Save and share</h2>
+            <div id="shareBody">
             <label class="field"><span>Design name</span><input class="text-input wide" id="projName" type="text" maxlength="60" placeholder="Untitled design" autocomplete="off"></label>
             <p class="hint" id="saveStatus">Not saved yet.</p>
             <div class="share-actions">
@@ -199,6 +203,7 @@
               <button class="btn" id="downloadBtn" type="button">Download PNG</button>
             </div>
             <p class="hint actions-note"><button class="link" id="downloadAllBtn" type="button">Download all three kits</button> · <button class="link" id="resetBtn" type="button">Start over</button></p>
+            </div>
           </div>
         </div>
       </div>
