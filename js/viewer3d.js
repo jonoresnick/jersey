@@ -43,6 +43,8 @@
     { re: /^sock_(left|right)$/, set: 'socks', base: 'socks', s1: 'sockStripe1', s2: 'sockStripe2', k: 1.3, limb: false },
   ];
   const FABRIC = new Set(['Jersey_Yellow', 'Fabric_Black']);
+  // Pants stripes run down the outer side seam of each leg (or round the leg near the hem).
+  const PANTS = { base: 'pants', s1: 'pantsStripe1', s2: 'pantsStripe2' };
   const traceOf = (obj, mat) => {
     for (const [re, m, zone] of TRACE) if (re.test(obj) && (m === null || m === mat)) return zone;
     return null;
@@ -141,6 +143,7 @@
           o.material = m;
           o.castShadow = !src.transparent; o.receiveShadow = true;
           const g = FABRIC.has(matName) && GARMENTS.find((x) => x.re.test(name));
+          if (matName === 'Pants_Nylon') { parts.push({ mesh: o, zone: 'pants', object: name, garment: 'pants', gdef: PANTS }); return; }
           parts.push({ mesh: o, zone: g ? g.base : zone, object: name, garment: g ? name : null, gdef: g || null });
         });
         // Stand the player on the floor and face the camera.
@@ -168,8 +171,9 @@
       meshes.forEach((m) => { const a = m.geometry.attributes.position; for (let i = 0; i < a.count; i += 3) out.push(v.fromBufferAttribute(a, i).applyMatrix4(m.matrixWorld).clone()); });
       return out;
     };
+    buildPants(pointsOf);
     const byName = {};
-    parts.forEach((p) => { if (p.garment) (byName[p.garment] = byName[p.garment] || { def: p.gdef, meshes: [] }).meshes.push(p.mesh); });
+    parts.forEach((p) => { if (p.garment && p.garment !== 'pants') (byName[p.garment] = byName[p.garment] || { def: p.gdef, meshes: [] }).meshes.push(p.mesh); });
     // the width of the jersey at the hem sets the scale, as in the photo
     const body = byName.jersey_body ? pointsOf(byName.jersey_body.meshes) : [];
     const minY = Math.min(...body.map((q) => q.y));
@@ -205,6 +209,78 @@
       });
     }
   }
+  /* Pants: distance round the leg from the outer seam, and height above the hem. */
+  const P = { mpp: 0.0014, U: null, v: [], h: [] };
+  function buildPants(pointsOf) {
+    const meshes = parts.filter((p) => p.garment === 'pants').map((p) => p.mesh);
+    if (!meshes.length) return;
+    const legs = ['left', 'right'].map((sd) => pointsOf(parts.filter((p) => p.object === 'pants_leg_' + sd && p.garment === 'pants').map((p) => p.mesh)));
+    const body = pointsOf(parts.filter((p) => p.object === 'jersey_body').map((p) => p.mesh));
+    const minY = Math.min(...body.map((q) => q.y)), hem = body.filter((q) => q.y < minY + 0.08);
+    if (hem.length) P.mpp = (Math.max(...hem.map((q) => q.x)) - Math.min(...hem.map((q) => q.x))) / 370;
+    const leg = legs.map((pts) => {
+      const xs = pts.map((q) => q.x), zs = pts.map((q) => q.z);
+      return { cx: xs.reduce((a, b) => a + b, 0) / xs.length, cz: zs.reduce((a, b) => a + b, 0) / zs.length,
+        r: (Math.max(...xs) - Math.min(...xs)) / 2, y0: Math.min(...pts.map((q) => q.y)) };
+    });
+    P.leg = leg;
+    const V2 = () => new THREE.Vector2(), C = () => new THREE.Color();
+    P.U = {
+      pLeg: { value: new THREE.Vector4(leg[0].cx, leg[1].cx, (leg[0].cz + leg[1].cz) / 2, (leg[0].r + leg[1].r) / 2) },
+      pHem: { value: Math.min(leg[0].y0, leg[1].y0) }, pBase: { value: C() },
+      pvB: { value: [V2(), V2(), V2()] }, pvC: { value: [C(), C(), C()] }, pvN: { value: 0 },
+      phB: { value: [V2(), V2()] }, phC: { value: [C(), C()] }, phN: { value: 0 },
+    };
+    meshes.forEach((m) => {
+      const mat = new THREE.MeshPhysicalMaterial({ roughness: 0.45, sheen: 0.3, sheenRoughness: 0.6, envMapIntensity: 0.55 });
+      mat.name = 'Pants (striped)';
+      mat.onBeforeCompile = (sh) => {
+        Object.assign(sh.uniforms, P.U);
+        sh.vertexShader = 'varying vec3 vStripeP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vStripeP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = `uniform vec4 pLeg; uniform float pHem; uniform vec3 pBase; uniform vec2 pvB[3]; uniform vec3 pvC[3]; uniform int pvN;
+uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP;\n` +
+          sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', `
+  float mid = 0.5 * (pLeg.x + pLeg.y);
+  float cx = vStripeP.x < mid ? min(pLeg.x, pLeg.y) : max(pLeg.x, pLeg.y);
+  float outward = sign(cx - mid);
+  float arc = abs(atan(vStripeP.z - pLeg.z, (vStripeP.x - cx) * outward)) * pLeg.w;
+  float up = vStripeP.y - pHem;
+  vec3 pc = pBase;
+  for (int i = 0; i < 3; i++) { if (i < pvN && arc >= pvB[i].x && arc <= pvB[i].y) pc = pvC[i]; }
+  for (int i = 0; i < 2; i++) { if (i < phN && up >= phB[i].x && up <= phB[i].y) pc = phC[i]; }
+  vec4 diffuseColor = vec4(pc, opacity);`);
+      };
+      m.material = mat;
+    });
+  }
+  // The same bands as js/photo.js, in photo pixels: side stripes as distance from the seam, leg bands as height above the hem.
+  const PANTS_SETS = {
+    none: { v: [], h: [] },
+    single: { v: [[0, 11, 1]], h: [] },
+    outlined: { v: [[0, 15, 2], [0, 10, 1]], h: [] },
+    twin: { v: [[3, 10, 1]], h: [] },
+    hem: { v: [], h: [[14, 28, 1], [33, 38, 2]] },
+  };
+  function stripePants(state, kit) {
+    if (!P.U) return;
+    const set = PANTS_SETS[kit.pants.stripe] || PANTS_SETS.none, k = P.mpp * 1.6;
+    const lin = (zone, c) => c.set(UB.color(state, kit, zone)).convertSRGBToLinear();
+    lin('pants', P.U.pBase.value);
+    P.v = set.v.map(([a, b, c]) => ({ a: a * k, b: b * k, zone: c === 1 ? 'pantsStripe1' : 'pantsStripe2' }));
+    P.h = set.h.map(([a, b, c]) => ({ a: a * k, b: b * k, zone: c === 1 ? 'pantsStripe1' : 'pantsStripe2' }));
+    P.v.forEach((x, i) => { P.U.pvB.value[i].set(x.a, x.b); lin(x.zone, P.U.pvC.value[i]); });
+    P.h.forEach((x, i) => { P.U.phB.value[i].set(x.a, x.b); lin(x.zone, P.U.phC.value[i]); });
+    P.U.pvN.value = P.v.length; P.U.phN.value = P.h.length;
+  }
+  function pantsZone(q) {
+    const L = P.U.pLeg.value, mid = (L.x + L.y) / 2, cx = q.x < mid ? Math.min(L.x, L.y) : Math.max(L.x, L.y);
+    const arc = Math.abs(Math.atan2(q.z - L.z, (q.x - cx) * Math.sign(cx - mid))) * L.w, up = q.y - P.U.pHem.value;
+    let z = 'pants';
+    P.v.forEach((x) => { if (arc >= x.a && arc <= x.b) z = x.zone; });
+    P.h.forEach((x) => { if (up >= x.a && up <= x.b) z = x.zone; });
+    return z;
+  }
+
   // Draw one garment's stripes into its strip texture (bottom of the canvas = the hem or cuff).
   function stripeGarment(G, state, kit) {
     const j = kit.jersey, sk = kit.socks, def = G.def;
@@ -225,6 +301,7 @@
   }
   // Which colour zone a point on a striped garment is.
   function garmentZone(name, point) {
+    if (name === 'pants') return P.U ? pantsZone(point) : 'pants';
     const G = garments.get(name);
     if (!G) return null;
     const t = point.dot(G.d) - G.o.dot(G.d);
@@ -311,11 +388,12 @@
 
   function paint(state, kit) {
     if (!root) return;
-    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, kit.template, kit.jersey.hem, kit.jersey.sleeve, kit.socks]);
+    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, kit.template, kit.jersey.hem, kit.jersey.sleeve, kit.socks, kit.pants]);
     if (key === lastPaint) return;
     lastPaint = key;
     const c = new THREE.Color();
     garments.forEach((G) => stripeGarment(G, state, kit));
+    stripePants(state, kit);
     for (const p of parts) {
       if (!p.zone || p.garment) continue;
       c.set(UB.color(state, kit, p.zone));
