@@ -50,6 +50,9 @@
   const ray = { r: null, p: null, down: null, click: false };
 
   function setup(el) {
+    try { return start(el); } catch (err) { return Promise.reject(err); }
+  }
+  function start(el) {
     THREE = window.THREE;
     host = el;
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -106,7 +109,10 @@
     new ResizeObserver(resize).observe(el);
 
     return new Promise((resolve, reject) => {
-      new THREE.GLTFLoader().load(UB.MODEL_GLB, (gltf) => {
+      // Decode the embedded model here rather than fetching a data: link, which some hosts block.
+      const b64 = UB.MODEL_GLB.slice(UB.MODEL_GLB.indexOf(',') + 1), bin = atob(b64), buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      new THREE.GLTFLoader().parse(buf.buffer, '', (gltf) => {
         root = gltf.scene;
         root.traverse((o) => {
           if (!o.isMesh) return;
@@ -136,7 +142,7 @@
         resize();
         loop();
         resolve();
-      }, undefined, reject);
+      }, reject);
     });
   }
 
@@ -234,7 +240,7 @@
     trace: () => parts.map((p) => ({ object: p.object, material: p.mesh.material.name, zone: p.zone })),
     /* Shows the model inside `el`; resolves once it is loaded. */
     open(el) {
-      if (!ready) ready = setup(el);
+      if (!ready) ready = setup(el).catch((err) => { ready = null; throw err; });
       return ready;
     },
     /* The colour zone under a click on the 3D canvas, or null for a drag or an empty spot. */

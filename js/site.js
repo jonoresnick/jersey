@@ -174,7 +174,8 @@
       $('#v3dLoad').hidden = true;
       UB.viewer3d.paint(state, kit());
     } catch (err) {
-      console.error(err); mode3d = false; render(); toast('Could not start the 3D view on this device.');
+      console.error(err); mode3d = false; render();
+      toast(/webgl|context/i.test(String(err && err.message)) ? 'This browser has 3D graphics (WebGL) turned off, so the 3D view can\'t start.' : 'Could not start the 3D view: ' + ((err && err.message) || err));
     }
   }
 
