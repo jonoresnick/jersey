@@ -124,7 +124,8 @@
     running = true;
     do {
       dirty = false;
-      if (route === 'design' && side === 'front') {
+      if (route === 'design' && mode3d) UB.viewer3d.paint(state, kit());
+      else if (route === 'design' && side === 'front') {
         const studio = wide() && (!state.view || state.view.scene === 'photo');
         await paintPhoto(studio ? { ...state, view: { ...state.view, scene: 'clear' } } : state, kit(), $('#photoCanvas'));
       }
@@ -133,6 +134,7 @@
   }
   function render() {
     if (route === 'design') {
+      syncMode();
       const back = side === 'back';
       $('#photoCanvas').hidden = back;
       $('#backWrap').hidden = !back;
@@ -150,6 +152,32 @@
     pump();
   }
 
+  /* ---------------- 3D view ---------------- */
+  // The Blender player (js/viewer3d.js). Drag to turn it; every part is traced to a colour zone.
+  let mode3d = false;
+  function syncMode() {
+    const card = $('#previewCard');
+    card.classList.toggle('is-3d', mode3d);
+    $('#view3d').hidden = !mode3d;
+    $('#zoomLayer').hidden = mode3d;
+    $('#sidePills').hidden = mode3d;
+    $$('#modePills .pill').forEach((b) => b.setAttribute('aria-checked', String((b.dataset.mode === '3d') === mode3d)));
+    if (mode3d) $('#zoomReset').hidden = true;
+  }
+  async function setMode(on) {
+    if (!UB.viewer3d || !window.THREE) { toast('3D needs WebGL, which this browser does not offer.'); return; }
+    mode3d = on; resetView(false); render();
+    $('#previewHint').textContent = on ? 'Drag to turn the player, scroll or pinch to zoom. Click any part to colour it.' : 'Click any part to change its colour.';
+    if (!on) return;
+    try {
+      await UB.viewer3d.open($('#view3d'));
+      $('#v3dLoad').hidden = true;
+      UB.viewer3d.paint(state, kit());
+    } catch (err) {
+      console.error(err); mode3d = false; render(); toast('Could not start the 3D view on this device.');
+    }
+  }
+
   /* ---------------- outliner and viewport labels ---------------- */
   const OUTLINE = [['body', 'Jersey'], ['sleeves', 'Sleeves'], ['stripe1', 'Main stripe'], ['stripe2', 'Accent stripe'], ['collar', 'Collar'],
     ['number', 'Numbers'], ['pants', 'Pants'], ['socks', 'Socks'], ['gloves', 'Gloves'], ['helmet', 'Helmet']];
@@ -158,7 +186,7 @@
     $('#olKit').textContent = `${UB.KIT_NAMES[state.active]} · ${k.swap ? 'Light' : 'Dark'}`;
     $('#olList').innerHTML = OUTLINE.map(([z, l]) =>
       `<button class="zone-row ol-row" type="button" data-zone="${z}"><i style="background:${UB.color(state, k, z)}"></i><b>${l}</b><span>${esc(slotLabel(UB.zoneValue(k, z)))}</span></button>`).join('');
-    $('#vpView').textContent = side === 'back' ? 'Back view' : 'Front view';
+    $('#vpView').textContent = mode3d ? '3D view' : side === 'back' ? 'Back view' : 'Front view';
     $('#vpWhat').textContent = `${state.team.name || 'My team'} | ${UB.KIT_NAMES[state.active]} · ${tpl ? tpl.name : ''}`;
   }
 
@@ -348,7 +376,7 @@
   let popZone = null;
   function openPicker(zone, at) {
     const z = UB.ZONES.find((x) => x.id === zone);
-    if (!z || !PHOTO_ZONES.includes(zone)) return;
+    if (!z || !(PHOTO_ZONES.includes(zone) || (mode3d && UB.viewer3d.zones().includes(zone)))) return;
     popZone = zone;
     const k = kit(), v = UB.zoneValue(k, zone), hex = UB.color(state, k, zone);
     pop().innerHTML =
@@ -580,6 +608,8 @@
       if (tpl) { applyTemplate(kit(), tpl.dataset.tpl); syncControls(); render(); commit(); return; }
       const sch = t.closest('[data-scheme]');
       if (sch) { state.team.palette = UB.SCHEMES[+sch.dataset.scheme].colors.slice(); syncControls(); render(); commit(); return; }
+      const modeBtn = t.closest('[data-mode]');
+      if (modeBtn) { setMode(modeBtn.dataset.mode === '3d'); return; }
       const sideBtn = t.closest('[data-side]');
       if (sideBtn) { side = sideBtn.dataset.side; render(); return; }
       const filt = t.closest('[data-filter]');
@@ -645,6 +675,7 @@
   // Which part is under the pointer on the preview (photo or flat back)?
   function previewZone(e) {
     if (route !== 'design' || view.moved) return null;
+    if (mode3d) return UB.viewer3d.zoneAt(e);
     const c = e.target.closest && e.target.closest('#photoCanvas');
     if (c) {
       const r = c.getBoundingClientRect();
@@ -703,7 +734,7 @@
     let start = null, pinch = null;
     const centre = () => { const a = [...pts.values()]; return a.length === 2 ? { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2, d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) } : null; };
     card.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.side-pills, .zoom-reset')) return;
+      if (mode3d || e.target.closest('.side-pills, .mode-pills, .zoom-reset')) return;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       view.moved = false;
       if (pts.size === 1) start = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
@@ -742,16 +773,23 @@
     addEventListener('pointerup', end);
     addEventListener('pointercancel', end);
     card.addEventListener('wheel', (e) => {
-      if (!e.ctrlKey && !e.metaKey) return;      // pinch on a trackpad, or ctrl and scroll
+      if (mode3d || (!e.ctrlKey && !e.metaKey)) return;      // pinch on a trackpad, or ctrl and scroll
       e.preventDefault();
       view.s = Math.max(1, Math.min(4, view.s * Math.exp(-e.deltaY * 0.01)));
       clampView(); applyView(false);
     }, { passive: false });
-    card.addEventListener('dblclick', () => { if (view.s > 1.01) resetView(true); else { view.s = 2; applyView(true); } });
+    card.addEventListener('dblclick', () => { if (mode3d) return; if (view.s > 1.01) resetView(true); else { view.s = 2; applyView(true); } });
     $('#zoomReset').addEventListener('click', () => resetView(true));
     $('#vTools').addEventListener('click', (e) => {
       const b = e.target.closest('[data-vt]'); if (!b) return;
       const t = b.dataset.vt;
+      if (mode3d && /^(zin|zout|fit|front|back)$/.test(t)) {
+        if (t === 'zin') UB.viewer3d.zoom(0.8);
+        if (t === 'zout') UB.viewer3d.zoom(1.25);
+        if (t === 'fit' || t === 'front') UB.viewer3d.frame('front');
+        if (t === 'back') UB.viewer3d.frame('back');
+        return;
+      }
       if (t === 'zin') { view.s = Math.min(4, view.s * 1.25); clampView(); applyView(true); }
       if (t === 'zout') { view.s = Math.max(1, view.s / 1.25); clampView(); applyView(true); }
       if (t === 'fit') resetView(true);

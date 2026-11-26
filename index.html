@@ -48,6 +48,11 @@
                 <div class="back-wrap" id="backWrap" hidden></div>
               </div>
             </div>
+            <div class="view3d" id="view3d" hidden><div class="v3d-load" id="v3dLoad">Loading the 3D player…</div></div>
+            <div class="pills small mode-pills" id="modePills" role="radiogroup" aria-label="Preview type">
+              <button class="pill" type="button" role="radio" data-mode="photo" aria-checked="true">Photo</button>
+              <button class="pill" type="button" role="radio" data-mode="3d" aria-checked="false">3D</button>
+            </div>
             <div class="pills small side-pills" id="sidePills" role="radiogroup" aria-label="Preview side">
               <button class="pill" type="button" role="radio" data-side="front" aria-checked="true">Front</button>
               <button class="pill" type="button" role="radio" data-side="back" aria-checked="false">Back</button>
@@ -295,6 +300,12 @@
   <script src="js/photo-assets.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/photo.js"></script>
+  <script src="js/vendor/three.min.js"></script>
+  <script src="js/vendor/OrbitControls.js"></script>
+  <script src="js/vendor/RoomEnvironment.js"></script>
+  <script src="js/vendor/GLTFLoader.js"></script>
+  <script src="js/model-assets.js"></script>
+  <script src="js/viewer3d.js"></script>
   <script src="js/api.js"></script>
   <script src="js/share.js"></script>
   <script src="js/social.js"></script>

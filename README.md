@@ -36,7 +36,8 @@ python3 -m http.server 8000
 - `js/photo.js`, `js/photo-assets.js`: repaint the mannequin photo with the design
 - `js/render.js`: flat jersey drawing (template thumbnails and the back view)
 - `scripts/photo-template/`: builds the photo template from a mock-up image
-- `labs/`: the earlier studio-style UI and an experimental 3D player (not used by the site)
+- `js/viewer3d.js`, `js/model-assets.js`, `js/vendor/`: the 3D view (three.js r147). The Blender model is traced part by part to the colour zones; see `blender/README.md`
+- `labs/`: the earlier studio-style UI and an experimental procedural 3D player (not used by the site)
 
 ## Accounts, teams and sharing
 
