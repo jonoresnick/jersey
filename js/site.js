@@ -126,8 +126,8 @@
       dirty = false;
       if (route === 'design' && mode3d) UB.viewer3d.paint(state, kit());
       else if (route === 'design' && side === 'front') {
-        const studio = wide() && (!state.view || state.view.scene === 'photo');
-        await paintPhoto(studio ? { ...state, view: { ...state.view, scene: 'clear' } } : state, kit(), $('#photoCanvas'));
+        await paintPhoto(state, kit(), $('#photoCanvas'));
+        tintFromPhoto();
       }
     } while (dirty);
     running = false;
@@ -148,8 +148,33 @@
       renderTeamColours();
       renderZones();
       renderOutliner();
+      layoutStudio();
     }
     pump();
+  }
+
+  /* ---------------- colour behind the photo ---------------- */
+  // Like album art: the page takes its colour from the bottom of the photo, so the
+  // picture fades into the controls, and a blurred copy fills the screen behind it.
+  function tintFromPhoto() {
+    const src = $('#photoCanvas');
+    try {
+      const bg = $('#npBg');
+      bg.getContext('2d').drawImage(src, 0, 0, bg.width, bg.height);
+      const h = Math.round(src.height * 0.1), px = src.getContext('2d').getImageData(0, src.height - h, src.width, h).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < px.length; i += 16) { const a = px[i + 3] / 255; r += px[i] * a; g += px[i + 1] * a; b += px[i + 2] * a; n += a; }
+      const hex = n > px.length / 64 ? '#' + [r, g, b].map((v) => Math.round(v / n).toString(16).padStart(2, '0')).join('') : state.team.palette[0];
+      document.body.style.setProperty('--np-bg', deepen(hex));
+    } catch (err) { /* a canvas we can't read keeps the last colour */ }
+  }
+  // Keep the hue, make it dark enough for white text.
+  function deepen(hex) {
+    const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
+    const mx = Math.max(...c), mn = Math.min(...c), l = (mx + mn) / 2, d = mx - mn;
+    let h = 0, sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+    if (d) h = mx === c[0] ? ((c[1] - c[2]) / d) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4;
+    return `hsl(${Math.round(h * 60 + 360) % 360} ${Math.round(Math.min(sat, 0.5) * 100)}% ${Math.round(Math.min(Math.max(l * 0.45, 0.09), 0.16) * 100)}%)`;
   }
 
   /* ---------------- 3D view ---------------- */
@@ -189,6 +214,8 @@
       `<button class="zone-row ol-row" type="button" data-zone="${z}"><i style="background:${UB.color(state, k, z)}"></i><b>${l}</b><span>${esc(slotLabel(UB.zoneValue(k, z)))}</span></button>`).join('');
     $('#vpView').textContent = mode3d ? '3D view' : side === 'back' ? 'Back view' : 'Front view';
     $('#vpWhat').textContent = `${state.team.name || 'My team'} | ${UB.KIT_NAMES[state.active]} · ${tpl ? tpl.name : ''}`;
+    $('#npTeam').textContent = state.team.name || 'My team';
+    $('#npKit').textContent = `${UB.KIT_NAMES[state.active]} jersey${tpl ? ' · ' + tpl.name : ''}`;
   }
 
   /* ---------------- controls ---------------- */
@@ -702,16 +729,15 @@
   // The picture fits the free space beside the floating panel; Save and share becomes a toolbar.
   const wide = () => matchMedia('(min-width: 961px)').matches;
   function layoutStudio() {
-    const box = $('#stageBox'), layer = $('#zoomLayer'), body = $('#shareBody');
+    const box = $('#stageBox'), body = $('#shareBody');
     if (!box || !body) return;
     const target = wide() ? $('#dock') : $('#shareOpt');
     if (body.parentElement !== target) target.append(body);
-    if (wide()) {
-      const r = layer.getBoundingClientRect();
-      if (!r.width) return;
-      const k = Math.min(r.width / 1098, r.height / 1122);
-      box.style.width = Math.floor(1098 * k) + 'px'; box.style.height = Math.floor(1122 * k) + 'px';
-    } else { box.style.width = ''; box.style.height = ''; }
+    const zl = $('#zoomLayer'), r = { width: zl.offsetWidth, height: zl.offsetHeight };   // ignores pinch zoom
+    if (!r.width) return;
+    // Computers: the whole player fits the screen. Phones: the photo fills the top edge to edge.
+    const k = wide() ? Math.min(r.width / 1098, r.height / 1122) : Math.max(r.width / 1098, r.height / 1122);
+    box.style.width = Math.ceil(1098 * k) + 'px'; box.style.height = Math.ceil(1122 * k) + 'px';
   }
 
   /* ---------------- pinch, pan and swipe on the preview ---------------- */

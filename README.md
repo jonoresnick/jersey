@@ -4,7 +4,7 @@ Design a hockey jersey and see it on a player. Built to look and work like Digit
 
 | Tab | Route | What it is |
 | --- | --- | --- |
-| Home | `#home` | The designer, laid out like a 3D tool such as Blender: a viewport with a floor grid and the player in the middle, a tool strip on the left (zoom, frame, front/back, undo/redo), an outliner of the uniform's parts and vertical property tabs on the right, and a status bar at the bottom with Save, Share, Social post and Download. This is the landing page. |
+| Home | `#home` | The designer, laid out like a music app's now-playing screen: the player photo fills the screen and fades into a colour taken from the photo, with a blurred copy behind it. The header, tools, tabs, controls and Save/Share bar float on frosted glass. On phones the photo sits at the top and fades into the tabs and controls, with a floating glass menu at the bottom. This is the landing page. |
 | Explore | `#explore` | Twelve starter designs in different colour schemes |
 | Saved designs | `#saved` | Your team's saved designs, with folders, search and version history |
 | Assets | `#assets` | The team's logos (crests, sponsors, patches) and brand colours |

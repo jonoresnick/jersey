@@ -7,7 +7,7 @@
   <meta name="description" content="Design a hockey jersey in your team's colours. Pick a template, set your stripes, add your crest, name and number, and see it on a player.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Graduate&family=Alfa+Slab+One&family=Bebas+Neue&family=Teko:wght@600&family=Staatliches&family=Saira+Stencil+One&family=Black+Ops+One&family=Russo+One&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Graduate&family=Alfa+Slab+One&family=Bebas+Neue&family=Teko:wght@600&family=Staatliches&family=Saira+Stencil+One&family=Black+Ops+One&family=Russo+One&display=swap">
   <link rel="stylesheet" href="css/site.css">
 </head>
 <body>
@@ -28,6 +28,7 @@
   <main>
     <!-- Design -->
     <section class="page step" data-page="design" aria-labelledby="designTitle" hidden>
+      <canvas class="np-bg" id="npBg" width="48" height="48" aria-hidden="true"></canvas>
       <div class="container layout">
         <div class="preview-col">
           <div class="step-head">
@@ -48,6 +49,7 @@
                 <div class="back-wrap" id="backWrap" hidden></div>
               </div>
             </div>
+            <div class="np-meta" id="npMeta"><h2 id="npTeam"></h2><p id="npKit"></p></div>
             <div class="view3d" id="view3d" hidden><div class="v3d-load" id="v3dLoad">Loading the 3D player…</div></div>
             <div class="pills small mode-pills" id="modePills" role="radiogroup" aria-label="Preview type">
               <button class="pill" type="button" role="radio" data-mode="photo" aria-checked="true">Photo</button>
