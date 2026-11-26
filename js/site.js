@@ -735,8 +735,8 @@
     if (body.parentElement !== target) target.append(body);
     const zl = $('#zoomLayer'), r = { width: zl.offsetWidth, height: zl.offsetHeight };   // ignores pinch zoom
     if (!r.width) return;
-    // Computers: the whole player fits the screen. Phones: the photo fills the top edge to edge.
-    const k = wide() ? Math.min(r.width / 1098, r.height / 1122) : Math.max(r.width / 1098, r.height / 1122);
+    // The whole player always fits, head to skates.
+    const k = Math.min(r.width / 1098, r.height / 1122);
     box.style.width = Math.ceil(1098 * k) + 'px'; box.style.height = Math.ceil(1122 * k) + 'px';
   }
 
