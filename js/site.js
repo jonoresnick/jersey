@@ -192,7 +192,7 @@
   async function setMode(on) {
     if (!UB.viewer3d || !window.THREE) { toast('3D needs WebGL, which this browser does not offer.'); return; }
     mode3d = on; resetView(false); render();
-    $('#previewHint').textContent = on ? 'Drag to turn the player, scroll or pinch to zoom. Click any part to colour it.' : 'Click any part to change its colour.';
+    $('#previewHint').textContent = on ? 'Drag to turn the player, scroll or pinch to zoom, double-click to look closer. Click any part to colour it.' : 'Click any part to change its colour.';
     if (!on) return;
     try {
       await UB.viewer3d.open($('#view3d'));
@@ -391,11 +391,13 @@
   const PHOTO_ZONES = ['body', 'sleeves', 'yoke', 'yokeTrim', 'stripe1', 'stripe2', 'pattern', 'collar', 'number', 'numberOutline', 'numberOutline2', 'name',
     'crestBg', 'crestRing', 'crestText', 'pants', 'pantsStripe1', 'pantsStripe2', 'socks', 'sockStripe1', 'sockStripe2', 'helmet', 'gloves', 'glovesTrim'];
   const slotLabel = (v) => (/^p\d$/.test(v) ? UB.PALETTE_SLOTS[+v[1]] : String(v).toUpperCase());
+  // the row label for a zone that still follows another one (a glove block that matches the gloves)
+  const zoneLabel = (k, z) => { const raw = k.colors[z] ?? UB.BASE_COLORS[z]; return typeof raw === 'string' && raw[0] === '=' ? 'Same as gloves' : slotLabel(UB.zoneValue(k, z)); };
   function renderZones() {
     const k = kit();
     $('#zones').innerHTML = UB.ZONE_GROUPS.map((g) => {
-      const rows = UB.ZONES.filter((z) => z.group === g.id && PHOTO_ZONES.includes(z.id)).map((z) =>
-        `<button class="zone-row" type="button" data-zone="${z.id}"><i style="background:${UB.color(state, k, z.id)}"></i><b>${esc(z.label)}</b><span>${esc(slotLabel(UB.zoneValue(k, z.id)))}</span></button>`).join('');
+      const rows = UB.ZONES.filter((z) => z.group === g.id && (PHOTO_ZONES.includes(z.id) || (mode3d && UB.viewer3d && UB.viewer3d.zones().includes(z.id)))).map((z) =>
+        `<button class="zone-row" type="button" data-zone="${z.id}"><i style="background:${UB.color(state, k, z.id)}"></i><b>${esc(z.label)}</b><span>${esc(zoneLabel(k, z.id))}</span></button>`).join('');
       return rows ? `<div class="zone-group"><h3>${esc(g.label)}</h3>${rows}</div>` : '';
     }).join('');
   }
@@ -811,6 +813,7 @@
     $('#vTools').addEventListener('click', (e) => {
       const b = e.target.closest('[data-vt]'); if (!b) return;
       const t = b.dataset.vt;
+      if (t === 'glove') { (mode3d ? Promise.resolve() : setMode(true)).then(() => UB.viewer3d.frame('glove')); return; }
       if (mode3d && /^(zin|zout|fit|front|back)$/.test(t)) {
         if (t === 'zin') UB.viewer3d.zoom(0.8);
         if (t === 'zout') UB.viewer3d.zoom(1.25);

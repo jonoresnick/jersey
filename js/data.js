@@ -71,6 +71,14 @@ UB.ZONES = [
   { id: 'helmetDecal',   label: 'Helmet number',   group: 'helmet' },
   { id: 'gloves',        label: 'Gloves',          group: 'gear' },
   { id: 'glovesTrim',    label: 'Glove cuffs & rolls', group: 'gear' },
+  /* Glove blocks (3D view): each starts the same as the gloves until you change it. */
+  { id: 'gloveFingers',  label: 'Glove finger rolls', group: 'gear' },
+  { id: 'gloveTips',     label: 'Glove fingertips',   group: 'gear' },
+  { id: 'gloveBars',     label: 'Glove backhand rolls', group: 'gear' },
+  { id: 'gloveThumb',    label: 'Glove thumb',        group: 'gear' },
+  { id: 'gloveSide',     label: 'Glove side panels',  group: 'gear' },
+  { id: 'gloveCuff',     label: 'Glove cuff',         group: 'gear' },
+  { id: 'glovePalm',     label: 'Glove palm',         group: 'gear' },
   { id: 'skates',        label: 'Skate boots',     group: 'gear' },
   { id: 'skatesTrim',    label: 'Skate accents',   group: 'gear' },
   { id: 'stick',         label: 'Stick',           group: 'gear' },
@@ -85,7 +93,8 @@ UB.BASE_COLORS = {
   pants: 'p0', pantsStripe1: 'p1', pantsStripe2: 'p2',
   socks: 'p0', sockStripe1: 'p1', sockStripe2: 'p2',
   helmet: 'p0', helmetTrim: 'p0', helmetDecal: 'p1',
-  gloves: 'p0', glovesTrim: 'p2', skates: '#17191C', skatesTrim: 'p0', stick: '#16181A',
+  gloves: 'p0', glovesTrim: 'p2',
+  gloveFingers: '=gloves', gloveTips: '=gloves', gloveBars: '=gloves', gloveThumb: '=gloves', gloveSide: '=gloves', gloveCuff: '=gloves', glovePalm: '#c9b088', skates: '#17191C', skatesTrim: 'p0', stick: '#16181A',
 };
 /* Zones a template sets when you apply it (everything else keeps your choice). */
 UB.TEMPLATE_ZONES = ['body', 'sleeves', 'yoke', 'yokeTrim', 'stripe1', 'stripe2', 'pattern',

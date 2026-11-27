@@ -99,7 +99,7 @@
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
-    controls.minDistance = 0.8; controls.maxDistance = 9;
+    controls.minDistance = 0.25; controls.maxDistance = 9;
     controls.maxPolarAngle = Math.PI * 0.53;
     controls.screenSpacePanning = true;
     controls.addEventListener('change', () => { if (tip) tip.hidden = true; });
@@ -117,6 +117,13 @@
       // a click (not a drag) on a part; the page asks for it with zoneAt() from its click handler
       const d = ray.down; ray.down = null;
       ray.click = !!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 6 && performance.now() - d.t <= 600;
+    });
+    cv.addEventListener('dblclick', (e) => {
+      const r = cv.getBoundingClientRect();
+      ray.p.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.r.setFromCamera(ray.p, camera);
+      const h = ray.r.intersectObjects(parts.filter((p) => p.mesh.visible).map((p) => p.mesh), false)[0];
+      if (h) focusOn(h.point, 0.55);
     });
     new ResizeObserver(resize).observe(el);
 
@@ -152,6 +159,7 @@
         root.position.x -= (box.min.x + box.max.x) / 2;
         root.position.z -= (box.min.z + box.max.z) / 2;
         scene.add(root);
+        splitGloves();
         buildGarments();
         placeNumbers();
         buildDecals();
@@ -161,6 +169,73 @@
         resolve();
       }, reject);
     });
+  }
+
+  /* ---------- gloves, block by block ----------
+   * Each glove in the model is 31 separate pieces (finger rolls, fingertips, palm pads, backhand panels
+   * and rolls, thumb, side panels, cuff and cuff roll). Find the pieces and sort them by where they sit,
+   * so each kind of block takes its own colour, like a pro glove builder. */
+  const GLOVE_ZONES = ['gloveFingers', 'gloveTips', 'gloveBars', 'gloveThumb', 'gloveSide', 'gloveCuff', 'glovePalm'];
+  function pieces(geo) {
+    const pos = geo.attributes.position, n = pos.count, up = new Int32Array(n);
+    for (let i = 0; i < n; i++) up[i] = i;
+    const find = (a) => { while (up[a] !== a) { up[a] = up[up[a]]; a = up[a]; } return a; };
+    const join = (a, b) => { a = find(a); b = find(b); if (a !== b) up[b] = a; };
+    const seen = new Map();
+    for (let i = 0; i < n; i++) {   // vertices split for shading still belong together
+      const k = Math.round(pos.getX(i) * 1e4) + ',' + Math.round(pos.getY(i) * 1e4) + ',' + Math.round(pos.getZ(i) * 1e4);
+      if (seen.has(k)) join(seen.get(k), i); else seen.set(k, i);
+    }
+    const idx = geo.index, nf = idx ? idx.count / 3 : n / 3, vi = (f, c) => (idx ? idx.getX(f * 3 + c) : f * 3 + c);
+    for (let f = 0; f < nf; f++) { join(vi(f, 0), vi(f, 1)); join(vi(f, 0), vi(f, 2)); }
+    const by = new Map();
+    for (let f = 0; f < nf; f++) {
+      const r = find(vi(f, 0));
+      if (!by.has(r)) by.set(r, { faces: [], c: new THREE.Vector3(), k: 0 });
+      const P = by.get(r); P.faces.push(f);
+      for (let c = 0; c < 3; c++) { P.c.x += pos.getX(vi(f, c)); P.c.y += pos.getY(vi(f, c)); P.c.z += pos.getZ(vi(f, c)); P.k++; }
+    }
+    return [...by.values()].map((P) => ({ faces: P.faces, c: P.c.divideScalar(P.k), vi }));
+  }
+  function splitGloves() {
+    for (const name of ['glove_left', 'glove_right']) {
+      const ps = parts.filter((p) => p.object === name);
+      if (!ps.length) continue;
+      const all = ps.map((p) => ({ p, list: pieces(p.mesh.geometry) }));
+      // in the model's own axes (Blender): x across the hand, y back of hand (+) / palm (-), z fingertips (-) to cuff (+)
+      const B = (c) => ({ x: c.x, y: -c.z, z: c.y });
+      const outer = all.flatMap((a) => a.list.map((q) => B(q.c))).filter((b) => Math.abs(b.x) > 0.05);
+      const thumbSign = outer.filter((b) => b.x > 0).length >= outer.filter((b) => b.x < 0).length ? 1 : -1;
+      for (const { p, list } of all) {
+        const mat = p.mesh.material.name, faceZone = {};
+        for (const q of list) {
+          const b = B(q.c);
+          let z = 'gloves';
+          if (mat === 'Glove_Palm') z = 'glovePalm';
+          else if (mat === 'Glove_Yellow') z = 'glovesTrim';
+          else if (b.z > 0.08) z = 'gloveCuff';
+          else if (b.z < -0.03) z = 'gloveTips';
+          else if (b.z < -0.005 && Math.abs(b.x) < 0.045) z = 'gloveFingers';
+          else if (Math.abs(b.x) > 0.05) z = Math.sign(b.x) === thumbSign ? 'gloveThumb' : 'gloveSide';
+          else if (b.z > 0.03 && b.y > 0.03) z = 'gloveBars';
+          (faceZone[z] = faceZone[z] || []).push(...q.faces.flatMap((f) => [q.vi(f, 0), q.vi(f, 1), q.vi(f, 2)]));
+        }
+        const src = p.mesh, parent = src.parent;
+        for (const [zone, index] of Object.entries(faceZone)) {
+          const g = new THREE.BufferGeometry();
+          for (const [k, v] of Object.entries(src.geometry.attributes)) g.setAttribute(k, v);
+          g.setIndex(index);
+          const m = new THREE.Mesh(g, src.material.clone());
+          m.name = src.name + '_' + zone;
+          m.position.copy(src.position); m.quaternion.copy(src.quaternion); m.scale.copy(src.scale);
+          m.castShadow = src.castShadow; m.receiveShadow = true;
+          parent.add(m);
+          parts.push({ mesh: m, zone, object: name });
+        }
+        parent.remove(src);
+        parts.splice(parts.indexOf(p), 1);
+      }
+    }
   }
 
   /* ---------- stripes and yoke on the fabric ---------- */
@@ -577,6 +652,19 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
     if (!animate) { camera.position.copy(to); controls.target.copy(c); controls.update(); return; }
     tween = { from: camera.position.clone(), to, t0: performance.now(), target0: controls.target.clone(), target1: c };
   }
+  // Fly the camera in to look closely at a point (keeps the current viewing direction).
+  function focusOn(point, dist) {
+    const dir = camera.position.clone().sub(controls.target).setLength(dist);
+    tween = { from: camera.position.clone(), to: point.clone().add(dir), t0: performance.now(), target0: controls.target.clone(), target1: point.clone() };
+  }
+  // A close look at one glove from the back of the hand.
+  function lookAtGlove(off = [-0.5, 0.15, 0.55]) {
+    const g = parts.filter((p) => p.object === 'glove_right').map((p) => p.mesh);
+    if (!g.length) return;
+    const box = new THREE.Box3(); g.forEach((m) => box.expandByObject(m));
+    const c = box.getCenter(new THREE.Vector3());
+    tween = { from: camera.position.clone(), to: c.clone().add(new THREE.Vector3(...off)), t0: performance.now(), target0: controls.target.clone(), target1: c };
+  }
   function zoom(f) {
     const d = camera.position.clone().sub(controls.target).multiplyScalar(f);
     const len = Math.max(controls.minDistance, Math.min(controls.maxDistance, d.length()));
@@ -649,7 +737,7 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
   }
 
   UB.viewer3d = {
-    zones: () => [...new Set([...TRACE.map((t) => t[2]), 'yoke', 'yokeTrim', 'collar', 'laces', 'name', 'crestBg', 'crestRing', 'crestText'])],
+    zones: () => [...new Set([...TRACE.map((t) => t[2]), ...GLOVE_ZONES, 'yoke', 'yokeTrim', 'collar', 'laces', 'name', 'crestBg', 'crestRing', 'crestText'])],
     trace: () => parts.map((p) => ({ object: p.object, material: p.mesh.material.name, zone: p.zone })),
     /* Shows the model inside `el`; resolves once it is loaded. */
     open(el) {
@@ -663,7 +751,7 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
       const p = pick(e);
       return p ? p.zone : null;
     },
-    paint, frame: (v) => root && frame(v), zoom: (f) => root && zoom(f),
+    paint, frame: (v, off) => root && (v === 'glove' ? lookAtGlove(off) : frame(v)), zoom: (f) => root && zoom(f),
     snapshot: () => renderer && renderer.domElement.toDataURL('image/png'),
     get loaded() { return !!root; },
   };

@@ -37,7 +37,11 @@
   };
 
   /* The slot or hex a zone shows, after the light-sweater swap. */
-  UB.zoneValue = (kit, zone) => UB.swapSlot(kit, zone, kit.colors[zone] ?? UB.BASE_COLORS[zone]);
+  // A value like '=gloves' means "the same as that zone" (used by the glove blocks).
+  UB.zoneValue = (kit, zone, depth = 0) => {
+    const v = UB.swapSlot(kit, zone, kit.colors[zone] ?? UB.BASE_COLORS[zone]);
+    return typeof v === 'string' && v[0] === '=' && depth < 4 ? UB.zoneValue(kit, v.slice(1), depth + 1) : v;
+  };
 
   /* The final hex colour of a zone. */
   UB.color = (design, kit, zone) => {
