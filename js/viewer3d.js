@@ -153,6 +153,7 @@
         root.position.z -= (box.min.z + box.max.z) / 2;
         scene.add(root);
         buildGarments();
+        placeNumbers();
         frame('front', false);
         resize();
         loop();
@@ -161,16 +162,59 @@
     });
   }
 
-  /* ---------- stripes on the fabric ---------- */
-  const garments = new Map();   // object name -> { def, meshes, o, d, L, tex, ctx, bands }
+  /* ---------- stripes and yoke on the fabric ---------- */
+  const garments = new Map();   // object name -> { def, o, d, L, mpp, tex, ctx, bands, U }
+  const V3 = () => new window.THREE.Vector3(), COL = () => new window.THREE.Color();   // the THREE variable is set later, in setup()
+  // Shoulder yoke, shared by the jersey body and both sleeves (same flat units as js/render.js yokePath).
+  const YU = { yOn: { value: 0 }, yStyle: { value: 1 }, yD: { value: 108 }, yTrim: { value: 6 }, yCol: { value: COL() }, yTrimCol: { value: COL() },
+    yHem: { value: 0 }, yCx: { value: 0 }, yMpp: { value: 0.0014 } };
+  const YOFF = { yOn: { value: 0 }, yStyle: { value: 1 }, yD: { value: 0 }, yTrim: { value: 0 }, yCol: { value: COL() }, yTrimCol: { value: COL() },
+    yHem: { value: 0 }, yCx: { value: 0 }, yMpp: { value: 1 } };
+  const YSTYLE = { straight: 1, v: 2, curved: 3, arched: 4 };
+  // Where a point sits on the flat jersey drawing, using the photo's flat scale (1.9 across, 1.3 down).
+  // The default yoke depth (108) sits on the yoke seam the modeller stitched across the chest (yHem holds its height).
+  function flatOf(q) {
+    return { x: 200 + (q.x - YU.yCx.value) / YU.yMpp.value / 1.9, y: 108 + (YU.yHem.value - q.y) / (1.3 * YU.yMpp.value) };
+  }
+  function yokeLine(fx) {
+    const D = YU.yD.value, t = Math.min(1, Math.max(0, (fx + 60) / 520));
+    switch (YU.yStyle.value) {
+      case 2: return D - 22 + 44 * (1 - Math.abs(fx - 200) / 260);
+      case 3: return D - 20 + 140 * t * (1 - t);
+      case 4: return D + 20 - 160 * t * (1 - t);
+      default: return D;
+    }
+  }
+  const FRAG_HEAD = `uniform sampler2D stripeMap; uniform vec3 axO; uniform vec3 axD; uniform float axL; uniform vec3 gBase;
+uniform float yOn; uniform int yStyle; uniform float yD; uniform float yTrim; uniform vec3 yCol; uniform vec3 yTrimCol;
+uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP;
+`;
+  const FRAG_BODY = `
+  float st = clamp(dot(vStripeP - axO, axD) / axL, 0.0, 1.0);
+  vec4 tx = texture2D(stripeMap, vec2(0.5, st));
+  vec3 gc = gBase;
+  if (yOn > 0.5) {
+    float fy = 108.0 + (yHem - vStripeP.y) / (1.3 * yMpp);
+    float fx = 200.0 + (vStripeP.x - yCx) / yMpp / 1.9;
+    float tt = clamp((fx + 60.0) / 520.0, 0.0, 1.0);
+    float B = yD;
+    if (yStyle == 2) B = yD - 22.0 + 44.0 * (1.0 - abs(fx - 200.0) / 260.0);
+    else if (yStyle == 3) B = yD - 20.0 + 140.0 * tt * (1.0 - tt);
+    else if (yStyle == 4) B = yD + 20.0 - 160.0 * tt * (1.0 - tt);
+    if (fy < B) gc = yCol; else if (fy < B + yTrim) gc = yTrimCol;
+  }
+  if (tx.a > 0.5) gc = pow(tx.rgb, vec3(2.2));
+  vec4 diffuseColor = vec4(gc, opacity);`;
+
   function buildGarments() {
     root.updateMatrixWorld(true);
-    const v = new THREE.Vector3();
+    const v = V3();
     const pointsOf = (meshes) => {
       const out = [];
       meshes.forEach((m) => { const a = m.geometry.attributes.position; for (let i = 0; i < a.count; i += 3) out.push(v.fromBufferAttribute(a, i).applyMatrix4(m.matrixWorld).clone()); });
       return out;
     };
+    const meshesOf = (re) => parts.filter((p) => re.test(p.object)).map((p) => p.mesh);
     buildPants(pointsOf);
     const byName = {};
     parts.forEach((p) => { if (p.garment && p.garment !== 'pants') (byName[p.garment] = byName[p.garment] || { def: p.gdef, meshes: [] }).meshes.push(p.mesh); });
@@ -179,36 +223,118 @@
     const minY = Math.min(...body.map((q) => q.y));
     const hemPts = body.filter((q) => q.y < minY + 0.08);
     const mpp = hemPts.length ? (Math.max(...hemPts.map((q) => q.x)) - Math.min(...hemPts.map((q) => q.x))) / 370 : 0.0014;
+    const seam = pointsOf(meshesOf(/^seam_yoke_/)), topY = Math.max(...body.map((q) => q.y));
+    YU.yHem.value = seam.length ? seam.reduce((a, q) => a + q.y, 0) / seam.length : topY - 0.13;
+    YU.yMpp.value = mpp;
+    YU.yCx.value = hemPts.length ? (Math.max(...hemPts.map((q) => q.x)) + Math.min(...hemPts.map((q) => q.x))) / 2 : 0;
     for (const [name, g] of Object.entries(byName)) {
-      const pts = pointsOf(g.meshes);
+      const pts = pointsOf(g.meshes), side = (name.match(/(left|right)$/) || [])[1];
       let d = new THREE.Vector3(0, 1, 0);
       if (g.def.limb) {
         // from the cuff (lowest end) toward the shoulder
         const ys = pts.map((q) => q.y).sort((a, b) => a - b), lo = ys[Math.floor(ys.length * 0.06)], hi = ys[Math.floor(ys.length * 0.94)];
-        const avg = (f) => { const s = pts.filter(f), c = new THREE.Vector3(); s.forEach((q) => c.add(q)); return c.divideScalar(s.length || 1); };
+        const avg = (f) => { const s = pts.filter(f), c = V3(); s.forEach((q) => c.add(q)); return c.divideScalar(s.length || 1); };
         d = avg((q) => q.y >= hi).sub(avg((q) => q.y <= lo)).normalize();
       }
-      const ts = pts.map((q) => q.dot(d)), t0 = Math.min(...ts), L = Math.max(...ts) - t0;
-      const o = d.clone().multiplyScalar(t0);
+      const ts = pts.map((q) => q.dot(d));
+      let t0 = Math.min(...ts);
+      // Measure from what you can see: the sleeve where it leaves the glove, the sock where it leaves the skate.
+      const cover = g.def.limb ? meshesOf(new RegExp('^glove_' + side + '$')) : g.def.set === 'socks' ? meshesOf(new RegExp('^skate_(boot|ankle|tongue)_' + side + '$')) : [];
+      if (cover.length) t0 = Math.max(t0, Math.max(...pointsOf(cover).map((q) => q.dot(d))));
+      const L = Math.max(...ts) - t0, o = d.clone().multiplyScalar(t0);
       const cv = document.createElement('canvas'); cv.width = 1; cv.height = 1024;
       const tex = new THREE.CanvasTexture(cv);
       tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-      const G = { def: g.def, o, d, L, mpp, tex, ctx: cv.getContext('2d'), bands: [] };
+      const jersey = g.def.set !== 'socks';
+      const U = Object.assign({ stripeMap: { value: tex }, axO: { value: o }, axD: { value: d }, axL: { value: L }, gBase: { value: COL() } }, jersey ? YU : YOFF);
+      const G = { def: g.def, o, d, L, mpp, tex, ctx: cv.getContext('2d'), bands: [], U, jersey, pts, t0, side };
       garments.set(name, G);
       g.meshes.forEach((m) => {
         const mat = new THREE.MeshPhysicalMaterial({ roughness: 0.85, sheen: 0.25, sheenRoughness: 0.6, envMapIntensity: 0.55 });
         mat.name = 'Fabric (striped)';
         mat.onBeforeCompile = (sh) => {
-          Object.assign(sh.uniforms, { stripeMap: { value: tex }, axO: { value: o }, axD: { value: d }, axL: { value: L } });
+          Object.assign(sh.uniforms, U);
           sh.vertexShader = 'varying vec3 vStripeP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vStripeP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-          sh.fragmentShader = 'uniform sampler2D stripeMap; uniform vec3 axO; uniform vec3 axD; uniform float axL; varying vec3 vStripeP;\n' +
-            sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
-              'float st = clamp(dot(vStripeP - axO, axD) / axL, 0.0, 1.0);\n  vec4 diffuseColor = vec4(pow(texture2D(stripeMap, vec2(0.5, st)).rgb, vec3(2.2)), opacity);');
+          sh.fragmentShader = FRAG_HEAD + sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', FRAG_BODY);
         };
         m.material = mat;
       });
     }
   }
+  // Shoulder numbers: the model has them on the front of the shoulders; move each onto the outside of its
+  // upper sleeve, upright along the arm and turned a little toward the front, where a pro jersey has them.
+  const NUM_SCALE = 1.7;
+  function placeNumbers() {
+    for (const side of ['left', 'right']) {
+      const G = garments.get('sleeve_' + side), num = parts.find((p) => p.object === 'number_' + side);
+      if (!G || !num) continue;
+      const out = new THREE.Vector3(side === 'left' ? 1 : -1, 0, 0);
+      const N = out.clone().sub(G.d.clone().multiplyScalar(out.dot(G.d))).normalize();
+      N.add(new THREE.Vector3(0, 0, 0.42)).sub(G.d.clone().multiplyScalar(0.42 * G.d.z)).normalize();
+      const band = G.pts.filter((q) => { const t = (q.dot(G.d) - G.t0) / G.L; return t > 0.55 && t < 0.63; });
+      if (!band.length) continue;
+      const anchor = band.reduce((a, q) => (q.dot(N) > a.dot(N) ? q : a));
+      const U = G.d.clone().sub(N.clone().multiplyScalar(G.d.dot(N))).normalize(), R = U.clone().cross(N);
+      // the number's local axes (from Blender text): x = reading direction, y = out of the face, z = down
+      const rot = new THREE.Matrix4().makeBasis(R, N, U.clone().negate());
+      const mesh = num.mesh, outline = parts.find((p) => p.object === 'number_' + side + '_outline');
+      mesh.updateMatrixWorld(true);
+      const rel = outline ? mesh.matrixWorld.clone().invert().multiply(outline.mesh.matrixWorld) : null;
+      const box = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position), c = box.getCenter(new THREE.Vector3());
+      c.y = box.max.y;
+      // The modelled numbers are about 5 cm tall; shoulder numbers on a pro jersey are closer to 9 cm.
+      const world = rot.clone().multiply(new THREE.Matrix4().makeScale(NUM_SCALE, NUM_SCALE, NUM_SCALE));
+      const pos = anchor.clone().add(N.clone().multiplyScalar(0.008)).sub(c.clone().applyMatrix4(world));
+      world.setPosition(pos);
+      const setWorld = (m, W) => { const parentInv = m.parent.matrixWorld.clone().invert(); parentInv.multiply(W).decompose(m.position, m.quaternion, m.scale); m.updateMatrixWorld(true); };
+      root.updateMatrixWorld(true);
+      setWorld(mesh, world);
+      if (outline) setWorld(outline.mesh, world.clone().multiply(rel));
+    }
+  }
+
+  // Draw one garment's stripes into its strip texture (bottom of the canvas = the hem, cuff or skate top).
+  // Stripes are opaque; everywhere else is clear so the shader shows the body colour or the yoke.
+  function stripeGarment(G, state, kit) {
+    const j = kit.jersey, sk = kit.socks, def = G.def;
+    const cfg = def.set === 'socks' ? { style: sk.style === 'match' ? j.hem.style : sk.style, offset: sk.offset, size: sk.size } : j[def.set];
+    const set = UB.STRIPE_SETS[cfg.style] || UB.STRIPE_SETS.none, H = 1024, c = G.ctx;
+    G.U.gBase.value.set(UB.color(state, kit, def.base)).convertSRGBToLinear();
+    c.clearRect(0, 0, 1, H);
+    G.bands = [];
+    for (const b of set.bands) {
+      let t0 = (cfg.offset + b.at * cfg.size) * def.k * G.mpp, t1 = t0 + b.h * cfg.size * def.k * G.mpp;
+      if (b.at === 0 && cfg.offset < 3) t0 = -1;
+      const zone = b.c === 1 ? def.s1 : def.s2;
+      G.bands.push({ t0, t1, zone });
+      c.fillStyle = UB.color(state, kit, zone);
+      const y0 = H - (t1 / G.L) * H, y1 = H - (Math.max(t0, 0) / G.L) * H;
+      c.fillRect(0, y0, 1, y1 - y0);
+    }
+    G.tex.needsUpdate = true;
+  }
+  function paintYoke(state, kit) {
+    const j = kit.jersey;
+    YU.yOn.value = j.yoke && j.yoke !== 'none' ? 1 : 0;
+    YU.yStyle.value = YSTYLE[j.yoke] || 1; YU.yD.value = j.yokeDepth; YU.yTrim.value = j.yokeTrim || 0;
+    YU.yCol.value.set(UB.color(state, kit, 'yoke')).convertSRGBToLinear();
+    YU.yTrimCol.value.set(UB.color(state, kit, 'yokeTrim')).convertSRGBToLinear();
+  }
+  // Which colour zone a point on a striped garment is.
+  function garmentZone(name, point) {
+    if (name === 'pants') return P.U ? pantsZone(point) : 'pants';
+    const G = garments.get(name);
+    if (!G) return null;
+    const t = point.dot(G.d) - G.o.dot(G.d);
+    for (let i = G.bands.length - 1; i >= 0; i--) if (t >= G.bands[i].t0 && t <= G.bands[i].t1) return G.bands[i].zone;
+    if (G.jersey && YU.yOn.value) {
+      const f = flatOf(point), B = yokeLine(f.x);
+      if (f.y < B) return 'yoke';
+      if (f.y < B + YU.yTrim.value) return 'yokeTrim';
+    }
+    return G.def.base;
+  }
+
   /* Pants: distance round the leg from the outer seam, and height above the hem. */
   const P = { mpp: 0.0014, U: null, v: [], h: [] };
   function buildPants(pointsOf) {
@@ -281,33 +407,6 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
     return z;
   }
 
-  // Draw one garment's stripes into its strip texture (bottom of the canvas = the hem or cuff).
-  function stripeGarment(G, state, kit) {
-    const j = kit.jersey, sk = kit.socks, def = G.def;
-    const cfg = def.set === 'socks' ? { style: sk.style === 'match' ? j.hem.style : sk.style, offset: sk.offset, size: sk.size } : j[def.set];
-    const set = UB.STRIPE_SETS[cfg.style] || UB.STRIPE_SETS.none, H = 1024, c = G.ctx;
-    c.fillStyle = UB.color(state, kit, def.base); c.fillRect(0, 0, 1, H);
-    G.bands = [];
-    for (const b of set.bands) {
-      let t0 = (cfg.offset + b.at * cfg.size) * def.k * G.mpp, t1 = t0 + b.h * cfg.size * def.k * G.mpp;
-      if (b.at === 0 && cfg.offset < 3) t0 = 0;
-      const zone = b.c === 1 ? def.s1 : def.s2;
-      G.bands.push({ t0, t1, zone });
-      c.fillStyle = UB.color(state, kit, zone);
-      const y0 = H - (t1 / G.L) * H, y1 = H - (t0 / G.L) * H;
-      c.fillRect(0, y0, 1, y1 - y0);
-    }
-    G.tex.needsUpdate = true;
-  }
-  // Which colour zone a point on a striped garment is.
-  function garmentZone(name, point) {
-    if (name === 'pants') return P.U ? pantsZone(point) : 'pants';
-    const G = garments.get(name);
-    if (!G) return null;
-    const t = point.dot(G.d) - G.o.dot(G.d);
-    for (let i = G.bands.length - 1; i >= 0; i--) if (t >= G.bands[i].t0 && t <= G.bands[i].t1) return G.bands[i].zone;
-    return G.def.base;
-  }
 
   // The player without the stick, so the camera centres on the body rather than the blade.
   function bodyBox() {
@@ -374,7 +473,7 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
     const zone = p ? p.zone : null;
     if (zone !== hovered) {
       hovered = zone;
-      const lit = (x) => zone && (x.zone === zone || (x.gdef && [x.gdef.s1, x.gdef.s2].includes(zone)));
+      const lit = (x) => zone && (x.zone === zone || (x.gdef && [x.gdef.s1, x.gdef.s2, ...(x.gdef.s1 === 'stripe1' ? ['yoke', 'yokeTrim'] : [])].includes(zone)));
       parts.forEach((x) => x.mesh.material.emissive.setHex(lit(x) ? 0x2a2f38 : 0x000000));
       renderer.domElement.style.cursor = zone ? 'pointer' : 'grab';
     }
@@ -388,10 +487,11 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
 
   function paint(state, kit) {
     if (!root) return;
-    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, kit.template, kit.jersey.hem, kit.jersey.sleeve, kit.socks, kit.pants]);
+    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, kit.template, kit.jersey.hem, kit.jersey.sleeve, kit.socks, kit.pants, kit.jersey.yoke, kit.jersey.yokeDepth, kit.jersey.yokeTrim]);
     if (key === lastPaint) return;
     lastPaint = key;
     const c = new THREE.Color();
+    paintYoke(state, kit);
     garments.forEach((G) => stripeGarment(G, state, kit));
     stripePants(state, kit);
     for (const p of parts) {
