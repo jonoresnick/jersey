@@ -17,7 +17,7 @@
     [/^sock_/, 'Jersey_Yellow', 'socks'],
     [/^(jersey_body|sleeve_)/, 'Fabric_Black', 'stripe1'],
     [/^sock_/, 'Fabric_Black', 'sockStripe1'],
-    [/^collar_binding$/, 'Fabric_Black', 'collar'],
+    [/^collar_binding$/, 'Fabric_Black', 'collarTrim'],
     [/^number_.*_outline$/, 'Fabric_Black', 'numberOutline'],
     [/^number_(left|right)$/, 'Plastic_White', 'number'],
     [/^seam_/, 'Seam_Gold', 'stripe2'],
@@ -154,6 +154,7 @@
         scene.add(root);
         buildGarments();
         placeNumbers();
+        buildDecals();
         frame('front', false);
         resize();
         loop();
@@ -171,6 +172,22 @@
   const YOFF = { yOn: { value: 0 }, yStyle: { value: 1 }, yD: { value: 0 }, yTrim: { value: 0 }, yCol: { value: COL() }, yTrimCol: { value: COL() },
     yHem: { value: 0 }, yCx: { value: 0 }, yMpp: { value: 1 } };
   const YSTYLE = { straight: 1, v: 2, curved: 3, arched: 4 };
+  // Collar band round the neck opening (traced from the collar binding), with the V or lace-up insert at the front.
+  const CU = { cOn: { value: 0 }, cStyle: { value: 0 }, cCx: { value: 0 }, cCz: { value: 0 }, cA: { value: 0.1 }, cB: { value: 0.1 },
+    cYf: { value: 1.5 }, cYb: { value: 1.5 }, cW: { value: 0.052 }, cVd: { value: 0.13 }, cVw: { value: 0.075 }, cCol: { value: COL() }, cLace: { value: COL() } };
+  const COFF = Object.fromEntries(Object.keys(CU).map((k) => [k, { value: k === 'cOn' ? 0 : CU[k].value }]));
+  const CSTYLE = { crew: 0, vneck: 1, laceup: 2 };
+  function collarAt(q) {
+    const th = Math.atan2((q.z - CU.cCz.value) / CU.cB.value, (q.x - CU.cCx.value) / CU.cA.value), fr = 0.5 + 0.5 * Math.sin(th);
+    const ring = new THREE.Vector3(CU.cCx.value + CU.cA.value * Math.cos(th), CU.cYb.value + (CU.cYf.value - CU.cYb.value) * fr, CU.cCz.value + CU.cB.value * Math.sin(th));
+    let zone = q.distanceTo(ring) < CU.cW.value ? 'collar' : null;
+    if (CU.cStyle.value >= 1 && q.z > CU.cCz.value) {
+      const t = (CU.cYf.value - q.y) / CU.cVd.value;
+      if (t > 0 && t < 1 && Math.abs(q.x - CU.cCx.value) < CU.cVw.value * (1 - t)) zone = 'collar';
+      if (CU.cStyle.value === 2 && Math.abs(q.x - CU.cCx.value) < 0.004 && t > 0 && t < 0.8) zone = 'laces';
+    }
+    return zone;
+  }
   // Where a point sits on the flat jersey drawing, using the photo's flat scale (1.9 across, 1.3 down).
   // The default yoke depth (108) sits on the yoke seam the modeller stitched across the chest (yHem holds its height).
   function flatOf(q) {
@@ -188,6 +205,8 @@
   const FRAG_HEAD = `uniform sampler2D stripeMap; uniform vec3 axO; uniform vec3 axD; uniform float axL; uniform vec3 gBase;
 uniform float yOn; uniform int yStyle; uniform float yD; uniform float yTrim; uniform vec3 yCol; uniform vec3 yTrimCol;
 uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP;
+uniform float cOn; uniform int cStyle; uniform float cCx; uniform float cCz; uniform float cA; uniform float cB; uniform float cYf; uniform float cYb;
+uniform float cW; uniform float cVd; uniform float cVw; uniform vec3 cCol; uniform vec3 cLace;
 `;
   const FRAG_BODY = `
   float st = clamp(dot(vStripeP - axO, axD) / axL, 0.0, 1.0);
@@ -202,6 +221,17 @@ uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP
     else if (yStyle == 3) B = yD - 20.0 + 140.0 * tt * (1.0 - tt);
     else if (yStyle == 4) B = yD + 20.0 - 160.0 * tt * (1.0 - tt);
     if (fy < B) gc = yCol; else if (fy < B + yTrim) gc = yTrimCol;
+  }
+  if (cOn > 0.5) {
+    vec2 cq = vec2((vStripeP.x - cCx) / cA, (vStripeP.z - cCz) / cB);
+    float th = atan(cq.y, cq.x), fr = 0.5 + 0.5 * sin(th);
+    vec3 ring = vec3(cCx + cA * cos(th), mix(cYb, cYf, fr), cCz + cB * sin(th));
+    if (distance(vStripeP, ring) < cW) gc = cCol;
+    if (cStyle >= 1 && vStripeP.z > cCz) {
+      float vt = (cYf - vStripeP.y) / cVd;
+      if (vt > 0.0 && vt < 1.0 && abs(vStripeP.x - cCx) < cVw * (1.0 - vt)) gc = cCol;
+      if (cStyle == 2 && abs(vStripeP.x - cCx) < 0.004 && vt > 0.0 && vt < 0.8) gc = cLace;
+    }
   }
   if (tx.a > 0.5) gc = pow(tx.rgb, vec3(2.2));
   vec4 diffuseColor = vec4(gc, opacity);`;
@@ -226,6 +256,17 @@ uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP
     const seam = pointsOf(meshesOf(/^seam_yoke_/)), topY = Math.max(...body.map((q) => q.y));
     YU.yHem.value = seam.length ? seam.reduce((a, q) => a + q.y, 0) / seam.length : topY - 0.13;
     YU.yMpp.value = mpp;
+    const ring = pointsOf(meshesOf(/^collar_binding$/));
+    if (ring.length) {
+      const xs = ring.map((q) => q.x), zs = ring.map((q) => q.z);
+      const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cz = (Math.max(...zs) + Math.min(...zs)) / 2;
+      const a = (Math.max(...xs) - Math.min(...xs)) / 2, b = (Math.max(...zs) - Math.min(...zs)) / 2;
+      const fy = ring.filter((q) => q.z > cz + b * 0.6).map((q) => q.y), by = ring.filter((q) => q.z < cz - b * 0.6).map((q) => q.y);
+      Object.assign(CU.cCx, { value: cx }); CU.cCz.value = cz; CU.cA.value = a; CU.cB.value = b;
+      CU.cYf.value = fy.length ? Math.min(...fy) : Math.min(...ring.map((q) => q.y));
+      CU.cYb.value = by.length ? by.reduce((s2, y) => s2 + y, 0) / by.length : CU.cYf.value;
+      CU.cOn.value = 1;
+    }
     YU.yCx.value = hemPts.length ? (Math.max(...hemPts.map((q) => q.x)) + Math.min(...hemPts.map((q) => q.x))) / 2 : 0;
     for (const [name, g] of Object.entries(byName)) {
       const pts = pointsOf(g.meshes), side = (name.match(/(left|right)$/) || [])[1];
@@ -246,7 +287,7 @@ uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP
       const tex = new THREE.CanvasTexture(cv);
       tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
       const jersey = g.def.set !== 'socks';
-      const U = Object.assign({ stripeMap: { value: tex }, axO: { value: o }, axD: { value: d }, axL: { value: L }, gBase: { value: COL() } }, jersey ? YU : YOFF);
+      const U = Object.assign({ stripeMap: { value: tex }, axO: { value: o }, axD: { value: d }, axL: { value: L }, gBase: { value: COL() } }, jersey ? YU : YOFF, name === 'jersey_body' ? CU : COFF);
       const G = { def: g.def, o, d, L, mpp, tex, ctx: cv.getContext('2d'), bands: [], U, jersey, pts, t0, side };
       garments.set(name, G);
       g.meshes.forEach((m) => {
@@ -261,35 +302,135 @@ uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP
       });
     }
   }
-  // Shoulder numbers: the model has them on the front of the shoulders; move each onto the outside of its
-  // upper sleeve, upright along the arm and turned a little toward the front, where a pro jersey has them.
-  const NUM_SCALE = 1.7;
+  /* ---------- printed and sewn-on artwork (decals) ----------
+   * The fabric has no UV map, so artwork is projected onto it like a print: the crest, captaincy and
+   * sponsor on the chest, patches on the shoulders, numbers on the sleeves, and the name and number on
+   * the back. Each is drawn on a canvas with the same code as the photo (UB.photo._), in your fonts. */
+  const decals = [];   // { key, w, h, canvas, ctx, tex, meshes, zone, draw }
+  const sleeveSpot = {};
+  function hitOn(meshes, origin, dir) {
+    const r = new THREE.Raycaster(origin, dir.clone().normalize());
+    const h = r.intersectObjects(meshes, false)[0];
+    if (!h) return null;
+    const n = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+    return { point: h.point, normal: n };
+  }
+  function orient(normal, up) {
+    const z = normal.clone().normalize(), y = up.clone().sub(z.clone().multiplyScalar(up.dot(z))).normalize(), x = y.clone().cross(z);
+    return new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+  }
+  function addDecal(key, targets, pos, normal, up, w, h, depth, zone, px, draw) {
+    const canvas = document.createElement('canvas'); canvas.width = px; canvas.height = Math.round(px * h / w);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
+    const mat = new THREE.MeshPhysicalMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4,
+      roughness: 0.62, envMapIntensity: 0.55, sheen: 0.15 });
+    mat.name = 'Print (' + key + ')';
+    const rot = orient(normal, up), size = new THREE.Vector3(w, h, depth), meshes = [];
+    targets.forEach((t) => {
+      const g = new THREE.DecalGeometry(t, pos, rot, size);
+      if (!g.attributes.position || !g.attributes.position.count) return;
+      const m = new THREE.Mesh(g, mat);
+      m.renderOrder = 2; m.receiveShadow = true;
+      scene.add(m); meshes.push(m);
+      parts.push({ mesh: m, zone, object: key, decal: true });
+    });
+    decals.push({ key, canvas, ctx: canvas.getContext('2d'), tex, meshes, zone, draw });
+  }
+  function buildDecals() {
+    root.updateMatrixWorld(true);
+    const body = parts.filter((p) => p.object === 'jersey_body').map((p) => p.mesh);
+    const sleeves = (sd) => parts.filter((p) => p.object === 'sleeve_' + sd && p.garment).map((p) => p.mesh);
+    const yH = garments.get('jersey_body') ? garments.get('jersey_body').o.y : 0.8, yS = YU.yHem.value, cx = YU.yCx.value, span = yS - yH;
+    const up = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(0, 0, 1), back = new THREE.Vector3(0, 0, -1);
+    const front = (x, y) => hitOn(body, new THREE.Vector3(x, y, 3), back);
+    const behind = (x, y) => hitOn(body, new THREE.Vector3(x, y, -3), fwd);
+    const P = () => UB.photo && UB.photo._;
+    // chest: crest in the middle, captaincy on the player's right, sponsor on the player's left (as in the photo)
+    let h = front(cx, yH + span * 0.62);
+    if (h) addDecal('crest', body, h.point, fwd, up, span * 0.5, span * 0.5, 0.14, 'crestBg', 512, async (c, d, k) => {
+      await P().drawCrest(c, d, k, 256, 256, 470 * Math.min(1.2, d.crest.scale || 1));
+    });
+    h = front(cx - 0.115, yS - 0.05);
+    if (h) addDecal('captain', body, h.point, fwd, up, 0.085, 0.085, 0.1, 'number', 256, async (c, d, k, L) => {
+      if (!d.player.captain || d.player.captain === 'none') return false;
+      if (L.logos.captain) { P().drawImageIn(c, await P().loadImg(L.logos.captain), 128, 128, 250, 250); return true; }
+      const px = 210 * L.nf.size; P().drawText(c, d.player.captain, 128, 128 + px * 0.36, px, L.nf, L.cols, Math.min(d.lettering.outlines, 1), 240); return true;
+    });
+    h = front(cx + 0.115, yS - 0.05);
+    if (h) addDecal('sponsor', body, h.point, fwd, up, 0.12, 0.052, 0.1, null, 512, async (c, d, k, L) => {
+      if (!L.logos.sponsor) return false;
+      P().drawImageIn(c, await P().loadImg(L.logos.sponsor), 256, c.canvas.height / 2, 500, c.canvas.height - 6); return true;
+    });
+    // shoulder patches: on top of each shoulder, reading upright from the front
+    for (const sd of ['left', 'right']) {
+      // on the front slope of the shoulder, above the yoke seam, facing forward and up
+      const dir = new THREE.Vector3(0, 0.3, 1).normalize(), target = new THREE.Vector3(cx + (sd === 'left' ? 1 : -1) * 0.165, yS + 0.015, CU.cCz.value);
+      const hs = hitOn([...body, ...sleeves(sd)], target.clone().add(dir.clone().multiplyScalar(3)), dir.clone().negate());
+      if (hs) addDecal('shoulder_' + sd, [...body, ...sleeves(sd)], hs.point, dir, up, 0.095, 0.095, 0.08, null, 256, async (c, d, k, L) => {
+        if (!L.logos.shoulder) return false;
+        P().drawImageIn(c, await P().loadImg(L.logos.shoulder), 128, 128, 250, 250); return true;
+      });
+    }
+    // sleeve numbers: outside of each upper sleeve, upright along the arm
+    for (const sd of ['left', 'right']) {
+      const S = sleeveSpot[sd];
+      if (S) addDecal('sleeve_number_' + sd, sleeves(sd), S.anchor, S.N, S.U, 0.13, 0.1, 0.07, 'number', 512, async (c, d, k, L) => {
+        if (!d.lettering.sleeveNumbers || !d.player.number) return false;
+        const px = 330 * L.nf.size; P().drawText(c, d.player.number, 256, c.canvas.height / 2 + px * 0.36, px, L.nf, L.cols, Math.min(d.lettering.outlines, 1), 490); return true;
+      });
+    }
+    // back: number in the middle, name above it
+    const nY = yH + span * 0.5;
+    h = behind(cx, nY);
+    if (h) addDecal('back_number', body, h.point, back, up, 0.31, 0.25, 0.14, 'number', 512, async (c, d, k, L) => {
+      if (!d.player.number) return false;
+      const px = 370 * L.nf.size; P().drawText(c, d.player.number, 256, c.canvas.height / 2 + px * 0.36, px, L.nf, L.cols, d.lettering.outlines, 500); return true;
+    });
+    h = behind(cx, nY + 0.19);
+    if (h) addDecal('back_name', body, h.point, back, up, 0.34, 0.055, 0.12, 'name', 1024, async (c, d, k, L) => {
+      if (!d.player.name) return false;
+      const px = 140 * L.af.size; P().drawText(c, d.player.name.toUpperCase(), 512, c.canvas.height / 2 + px * 0.36, px, L.af, { fill: L.col('name'), o1: L.col('numberOutline'), o2: L.col('numberOutline2') }, 0, 1000); return true;
+    });
+  }
+  let decalKey = '', decalJob = 0;
+  async function paintDecals(state, kit) {
+    if (!decals.length || !UB.photo || !UB.photo._) return;
+    const logos = state.photoLogos || {}, sig = (v) => (v ? String(v).length + String(v).slice(-24) : '');
+    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, state.crest.style, state.crest.initials, state.crest.wordmark, state.crest.scale, sig(state.crest.image),
+      state.player, state.lettering, Object.keys(logos).map((n) => n + sig(logos[n]))]);
+    if (key === decalKey) return;
+    decalKey = key;
+    const job = ++decalJob, P = UB.photo._, col = (z) => UB.color(state, kit, z);
+    const nf = P.fontOf(state.lettering.numberFont), af = P.fontOf(state.lettering.nameFont || state.lettering.numberFont);
+    await Promise.all([document.fonts.load(P.canvasFont(nf, 60)), document.fonts.load(P.canvasFont(af, 60))]).catch(() => {});
+    const L = { logos, nf, af, col, cols: { fill: col('number'), o1: col('numberOutline'), o2: col('numberOutline2') } };
+    for (const D of decals) {
+      if (job !== decalJob) return;          // a newer change is already drawing
+      D.ctx.clearRect(0, 0, D.canvas.width, D.canvas.height);
+      let shown = true;
+      try { shown = (await D.draw(D.ctx, state, kit, L)) !== false; } catch (err) { shown = false; }
+      D.meshes.forEach((m) => { m.visible = shown; });
+      D.tex.needsUpdate = true;
+    }
+  }
+
+  // Shoulder numbers: the model has them on the front of the shoulders. Find the spot on the outside of
+  // each upper sleeve, upright along the arm and turned a little toward the front, where a pro jersey
+  // has them; the sleeve-number decals go there and the modelled numbers are hidden.
   function placeNumbers() {
     for (const side of ['left', 'right']) {
-      const G = garments.get('sleeve_' + side), num = parts.find((p) => p.object === 'number_' + side);
-      if (!G || !num) continue;
+      const G = garments.get('sleeve_' + side);
+      parts.filter((p) => /^number_(left|right)(_outline)?$/.test(p.object) && p.object.includes(side)).forEach((p) => { p.mesh.visible = false; });
+      if (!G) continue;
       const out = new THREE.Vector3(side === 'left' ? 1 : -1, 0, 0);
       const N = out.clone().sub(G.d.clone().multiplyScalar(out.dot(G.d))).normalize();
       N.add(new THREE.Vector3(0, 0, 0.42)).sub(G.d.clone().multiplyScalar(0.42 * G.d.z)).normalize();
       const band = G.pts.filter((q) => { const t = (q.dot(G.d) - G.t0) / G.L; return t > 0.55 && t < 0.63; });
       if (!band.length) continue;
       const anchor = band.reduce((a, q) => (q.dot(N) > a.dot(N) ? q : a));
-      const U = G.d.clone().sub(N.clone().multiplyScalar(G.d.dot(N))).normalize(), R = U.clone().cross(N);
-      // the number's local axes (from Blender text): x = reading direction, y = out of the face, z = down
-      const rot = new THREE.Matrix4().makeBasis(R, N, U.clone().negate());
-      const mesh = num.mesh, outline = parts.find((p) => p.object === 'number_' + side + '_outline');
-      mesh.updateMatrixWorld(true);
-      const rel = outline ? mesh.matrixWorld.clone().invert().multiply(outline.mesh.matrixWorld) : null;
-      const box = new THREE.Box3().setFromBufferAttribute(mesh.geometry.attributes.position), c = box.getCenter(new THREE.Vector3());
-      c.y = box.max.y;
-      // The modelled numbers are about 5 cm tall; shoulder numbers on a pro jersey are closer to 9 cm.
-      const world = rot.clone().multiply(new THREE.Matrix4().makeScale(NUM_SCALE, NUM_SCALE, NUM_SCALE));
-      const pos = anchor.clone().add(N.clone().multiplyScalar(0.008)).sub(c.clone().applyMatrix4(world));
-      world.setPosition(pos);
-      const setWorld = (m, W) => { const parentInv = m.parent.matrixWorld.clone().invert(); parentInv.multiply(W).decompose(m.position, m.quaternion, m.scale); m.updateMatrixWorld(true); };
-      root.updateMatrixWorld(true);
-      setWorld(mesh, world);
-      if (outline) setWorld(outline.mesh, world.clone().multiply(rel));
+      const U = G.d.clone().sub(N.clone().multiplyScalar(G.d.dot(N))).normalize();
+      sleeveSpot[side] = { anchor, N, U };
     }
   }
 
@@ -315,6 +456,9 @@ uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP
   }
   function paintYoke(state, kit) {
     const j = kit.jersey;
+    CU.cStyle.value = CSTYLE[j.collar] ?? 1;
+    CU.cCol.value.set(UB.color(state, kit, 'collar')).convertSRGBToLinear();
+    CU.cLace.value.set(UB.color(state, kit, 'laces')).convertSRGBToLinear();
     YU.yOn.value = j.yoke && j.yoke !== 'none' ? 1 : 0;
     YU.yStyle.value = YSTYLE[j.yoke] || 1; YU.yD.value = j.yokeDepth; YU.yTrim.value = j.yokeTrim || 0;
     YU.yCol.value.set(UB.color(state, kit, 'yoke')).convertSRGBToLinear();
@@ -327,6 +471,7 @@ uniform float yHem; uniform float yCx; uniform float yMpp; varying vec3 vStripeP
     if (!G) return null;
     const t = point.dot(G.d) - G.o.dot(G.d);
     for (let i = G.bands.length - 1; i >= 0; i--) if (t >= G.bands[i].t0 && t <= G.bands[i].t1) return G.bands[i].zone;
+    if (name === 'jersey_body' && CU.cOn.value) { const cz = collarAt(point); if (cz) return cz; }
     if (G.jersey && YU.yOn.value) {
       const f = flatOf(point), B = yokeLine(f.x);
       if (f.y < B) return 'yoke';
@@ -459,7 +604,7 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
     const r = renderer.domElement.getBoundingClientRect();
     ray.p.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.r.setFromCamera(ray.p, camera);
-    const hits = ray.r.intersectObjects(parts.map((p) => p.mesh), false);
+    const hits = ray.r.intersectObjects(parts.filter((p) => p.mesh.visible).map((p) => p.mesh), false);
     for (const h of hits) {
       const p = parts.find((x) => x.mesh === h.object);
       if (p && p.mesh.material.name === 'Visor_Clear') continue;   // see through the visor
@@ -487,13 +632,14 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
 
   function paint(state, kit) {
     if (!root) return;
-    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, kit.template, kit.jersey.hem, kit.jersey.sleeve, kit.socks, kit.pants, kit.jersey.yoke, kit.jersey.yokeDepth, kit.jersey.yokeTrim]);
-    if (key === lastPaint) return;
+    const key = JSON.stringify([state.team.palette, kit.colors, kit.swap, kit.template, kit.jersey.hem, kit.jersey.sleeve, kit.socks, kit.pants, kit.jersey.yoke, kit.jersey.yokeDepth, kit.jersey.yokeTrim, kit.jersey.collar]);
+    if (key === lastPaint) { paintDecals(state, kit); return; }
     lastPaint = key;
     const c = new THREE.Color();
     paintYoke(state, kit);
     garments.forEach((G) => stripeGarment(G, state, kit));
     stripePants(state, kit);
+    paintDecals(state, kit);
     for (const p of parts) {
       if (!p.zone || p.garment) continue;
       c.set(UB.color(state, kit, p.zone));
@@ -503,7 +649,7 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
   }
 
   UB.viewer3d = {
-    zones: () => [...new Set(TRACE.map((t) => t[2]))],
+    zones: () => [...new Set([...TRACE.map((t) => t[2]), 'yoke', 'yokeTrim', 'collar', 'laces', 'name', 'crestBg', 'crestRing', 'crestText'])],
     trace: () => parts.map((p) => ({ object: p.object, material: p.mesh.material.name, zone: p.zone })),
     /* Shows the model inside `el`; resolves once it is loaded. */
     open(el) {

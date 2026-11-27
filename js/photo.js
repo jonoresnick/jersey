@@ -465,7 +465,9 @@
   }
 
   UB.POSES[0].geo = UB.POSES[0].geo || GEO;
-  UB.photo = { render, zoneAt, available: () => !!UB.PHOTO_ASSETS, GEO };
+  UB.photo = { render, zoneAt, available: () => !!UB.PHOTO_ASSETS, GEO,
+    // drawing helpers the 3D view reuses for its crest, numbers and patches
+    _: { drawCrest, drawText, fontOf, canvasFont, loadImg, drawImageIn } };
   /* Shared with the 3D view: lettering, crest and logo drawing on a 2D canvas. */
   UB.paint = { drawText, drawCrest, drawImageIn, loadImg, fontOf, canvasFont };
 })();
