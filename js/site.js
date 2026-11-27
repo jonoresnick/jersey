@@ -392,7 +392,8 @@
     'crestBg', 'crestRing', 'crestText', 'pants', 'pantsStripe1', 'pantsStripe2', 'socks', 'sockStripe1', 'sockStripe2', 'helmet', 'gloves', 'glovesTrim'];
   const slotLabel = (v) => (/^p\d$/.test(v) ? UB.PALETTE_SLOTS[+v[1]] : String(v).toUpperCase());
   // the row label for a zone that still follows another one (a glove block that matches the gloves)
-  const zoneLabel = (k, z) => { const raw = k.colors[z] ?? UB.BASE_COLORS[z]; return typeof raw === 'string' && raw[0] === '=' ? 'Same as gloves' : slotLabel(UB.zoneValue(k, z)); };
+  const zoneName = (z) => (UB.ZONES.find((x) => x.id === z) || { label: z }).label;
+  const zoneLabel = (k, z) => { const raw = k.colors[z] ?? UB.BASE_COLORS[z]; return typeof raw === 'string' && raw[0] === '=' ? 'Same as ' + zoneName(raw.slice(1)).replace(/^Glove /, '').toLowerCase() : slotLabel(UB.zoneValue(k, z)); };
   function renderZones() {
     const k = kit();
     $('#zones').innerHTML = UB.ZONE_GROUPS.map((g) => {
@@ -403,14 +404,20 @@
   }
 
   const pop = () => $('#popover');
-  let popZone = null;
+  let popZone = null, popAt = null;
   function openPicker(zone, at) {
     const z = UB.ZONES.find((x) => x.id === zone);
     if (!z || !(PHOTO_ZONES.includes(zone) || (mode3d && UB.viewer3d.zones().includes(zone)))) return;
-    popZone = zone;
+    popZone = zone; popAt = at;
+    // a glove block can be coloured on its own, or with the rest of its group
+    const parent = UB.ZONE_PARENT && UB.ZONE_PARENT[zone], child = pop().dataset.child;
+    const scopeOf = parent ? zone : (child && UB.ZONE_PARENT[child] === zone ? child : null);
+    pop().dataset.child = scopeOf || '';
     const k = kit(), v = UB.zoneValue(k, zone), hex = UB.color(state, k, zone);
     pop().innerHTML =
       `<div class="pop-head"><strong>${esc(z.label)}</strong><button class="icon-btn" type="button" data-pop-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>` +
+      (scopeOf ? `<div class="pills small pop-scope" role="radiogroup" aria-label="Colour"><button class="pill" type="button" role="radio" data-pop-scope="${scopeOf}" aria-checked="${zone === scopeOf}">This block</button><button class="pill" type="button" role="radio" data-pop-scope="${UB.ZONE_PARENT[scopeOf]}" aria-checked="${zone !== scopeOf}">All ${esc(zoneName(UB.ZONE_PARENT[scopeOf]).replace(/^Glove /, '').toLowerCase())}</button></div>` : '') +
+      (parent && k.colors[zone] && k.colors[zone][0] !== '=' ? `<button class="link pop-reset" type="button" data-pop-reset>Match the rest of the ${esc(zoneName(parent).replace(/^Glove /, '').toLowerCase())}</button>` : '') +
       `<div class="pop-swatches">${state.team.palette.map((c, i) => `<button class="swatch" type="button" role="radio" data-slot="p${i}" aria-checked="${v === 'p' + i}" aria-label="${UB.PALETTE_SLOTS[i]}" style="--c:${c}"></button>`).join('')}</div>` +
       `<div class="pop-custom"><input type="color" id="popColor" value="${hex}" aria-label="Custom colour"><input type="text" id="popHex" value="${hex.toUpperCase()}" maxlength="7" spellcheck="false" aria-label="Hex colour"></div>`;
     pop().hidden = false;
@@ -418,7 +425,7 @@
     pop().style.left = Math.max(8, Math.min(innerWidth - w - 8, at.x - w / 2)) + 'px';
     pop().style.top = (at.y + 16 + h > innerHeight - 8 ? Math.max(8, at.y - h - 16) : at.y + 16) + 'px';
   }
-  function closePicker() { pop().hidden = true; popZone = null; }
+  function closePicker() { pop().hidden = true; popZone = null; pop().dataset.child = ''; }
   function setZone(value, done) {
     const k = kit();
     k.colors[popZone] = /^p\d$/.test(value) ? UB.swapSlot(k, popZone, value) : value;
@@ -661,6 +668,9 @@
         return;
       }
       if (t.closest('[data-pop-close]')) { closePicker(); return; }
+      const scope = t.closest('[data-pop-scope]');
+      if (scope) { openPicker(scope.dataset.popScope, popAt); return; }
+      if (t.closest('[data-pop-reset]') && popZone) { const z = popZone; delete kit().colors[z]; render(); commit(); openPicker(z, popAt); return; }
       if (popZone && !t.closest('#popover')) closePicker();
 
       // logos

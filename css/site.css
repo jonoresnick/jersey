@@ -709,3 +709,8 @@ body[data-route="design"] .bottom-nav a[aria-current="page"] { background: rgba(
   .site-header { display: none; }
   .page:not(.step) { padding-top: calc(24px + env(safe-area-inset-top, 0px)); }
 }
+/* colour picker: this block or the whole group (glove blocks) */
+.pop-scope { gap: 6px; }
+.popover .pill, .popover .pill[aria-checked="true"] { min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 13px; box-shadow: none; }
+.popover .pill[aria-checked="true"] { background: #fff; color: #111; }
+.pop-reset { justify-self: start; padding: 0; border: 0; background: none; color: #8fd3ff; font-size: 13px; font-weight: 600; cursor: pointer; }

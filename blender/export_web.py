@@ -18,6 +18,21 @@ for o in bpy.data.objects:
     for m in getattr(o, 'modifiers', []):
         if m.type == 'SUBSURF':
             m.levels = min(m.levels, LV); m.render_levels = min(m.render_levels, LV)
+# Gloves: save every block (each loose piece) as its own object, glove_left__0, glove_left__1, ...
+# so the website can colour them one by one. Blocks that touch would otherwise be welded together.
+for name in ('glove_left', 'glove_right'):
+    o = bpy.data.objects.get(name)
+    if not o or o.type != 'MESH':
+        continue
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.context.view_layer.objects.active = o
+    o.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.separate(type='LOOSE')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    for i, piece in enumerate(sorted(bpy.context.selected_objects, key=lambda x: x.name)):
+        piece.name = f'{name}__{i}'
 keep = []
 for o in list(bpy.data.objects):
     if o.type in ('LIGHT', 'CAMERA', 'EMPTY') or o.name in ('Backdrop', 'Floor'):

@@ -40,6 +40,7 @@ UB.ZONE_GROUPS = [
   { id: 'socks',    label: 'Socks' },
   { id: 'helmet',   label: 'Helmet' },
   { id: 'gear',     label: 'Gloves, skates & stick' },
+  { id: 'gloveBlocks', label: 'Glove blocks (3D)' },
 ];
 UB.ZONES = [
   { id: 'body',          label: 'Body',            group: 'jersey' },
@@ -84,6 +85,28 @@ UB.ZONES = [
   { id: 'stick',         label: 'Stick',           group: 'gear' },
 ];
 
+/* Every block of the glove, one by one (3D view). Each block follows its group (for example all
+   fingertips) until you colour that block on its own. Both gloves match. */
+UB.GLOVE_BLOCKS = [];
+UB.ZONE_PARENT = {};
+(() => {
+  const add = (id, label, parent) => { UB.GLOVE_BLOCKS.push({ id, label, group: 'gloveBlocks', parent }); UB.ZONE_PARENT[id] = parent; };
+  ['Index', 'Middle', 'Ring', 'Pinky'].forEach((f, i) => {
+    const n = f.toLowerCase();
+    add(`gl_${n}_tip`, `${f} fingertip`, 'gloveTips');
+    add(`gl_${n}_under`, `${f} fingertip, palm side`, 'gloveTips');
+    add(`gl_${n}_roll`, `${f} finger roll`, 'gloveFingers');
+    add(`gl_${n}_pad`, `${f} finger pad`, 'glovePalm');
+  });
+  [1, 2].forEach((i) => add(`gl_back_${i}`, `Backhand panel ${i}`, 'gloves'));
+  [1, 2, 3].forEach((i) => add(`gl_bar_${i}`, `Backhand roll ${i}`, 'gloveBars'));
+  [1, 2, 3, 4].forEach((i) => add(`gl_thumb_${i}`, `Thumb block ${i}`, 'gloveThumb'));
+  [1, 2].forEach((i) => add(`gl_side_${i}`, `Side panel ${i}`, 'gloveSide'));
+  add('gl_core', 'Glove centre', 'gloves');
+  add('gl_palm', 'Palm', 'glovePalm');
+})();
+UB.ZONES.push(...UB.GLOVE_BLOCKS);
+
 /* Default colour for each zone. Templates override the jersey and sock zones. */
 UB.BASE_COLORS = {
   body: 'p0', sleeves: 'p0', yoke: 'p1', yokeTrim: 'p2', stripe1: 'p1', stripe2: 'p2',
@@ -96,6 +119,7 @@ UB.BASE_COLORS = {
   gloves: 'p0', glovesTrim: 'p2',
   gloveFingers: '=gloves', gloveTips: '=gloves', gloveBars: '=gloves', gloveThumb: '=gloves', gloveSide: '=gloves', gloveCuff: '=gloves', glovePalm: '#c9b088', skates: '#17191C', skatesTrim: 'p0', stick: '#16181A',
 };
+UB.GLOVE_BLOCKS.forEach((b) => { UB.BASE_COLORS[b.id] = '=' + b.parent; });
 /* Zones a template sets when you apply it (everything else keeps your choice). */
 UB.TEMPLATE_ZONES = ['body', 'sleeves', 'yoke', 'yokeTrim', 'stripe1', 'stripe2', 'pattern',
   'collar', 'collarTrim', 'cuffs', 'laces', 'socks', 'sockStripe1', 'sockStripe2'];

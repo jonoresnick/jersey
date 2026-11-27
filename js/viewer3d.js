@@ -175,66 +175,55 @@
    * Each glove in the model is 31 separate pieces (finger rolls, fingertips, palm pads, backhand panels
    * and rolls, thumb, side panels, cuff and cuff roll). Find the pieces and sort them by where they sit,
    * so each kind of block takes its own colour, like a pro glove builder. */
-  const GLOVE_ZONES = ['gloveFingers', 'gloveTips', 'gloveBars', 'gloveThumb', 'gloveSide', 'gloveCuff', 'glovePalm'];
-  function pieces(geo) {
-    const pos = geo.attributes.position, n = pos.count, up = new Int32Array(n);
-    for (let i = 0; i < n; i++) up[i] = i;
-    const find = (a) => { while (up[a] !== a) { up[a] = up[up[a]]; a = up[a]; } return a; };
-    const join = (a, b) => { a = find(a); b = find(b); if (a !== b) up[b] = a; };
-    const seen = new Map();
-    for (let i = 0; i < n; i++) {   // vertices split for shading still belong together
-      const k = Math.round(pos.getX(i) * 1e4) + ',' + Math.round(pos.getY(i) * 1e4) + ',' + Math.round(pos.getZ(i) * 1e4);
-      if (seen.has(k)) join(seen.get(k), i); else seen.set(k, i);
-    }
-    const idx = geo.index, nf = idx ? idx.count / 3 : n / 3, vi = (f, c) => (idx ? idx.getX(f * 3 + c) : f * 3 + c);
-    for (let f = 0; f < nf; f++) { join(vi(f, 0), vi(f, 1)); join(vi(f, 0), vi(f, 2)); }
-    const by = new Map();
-    for (let f = 0; f < nf; f++) {
-      const r = find(vi(f, 0));
-      if (!by.has(r)) by.set(r, { faces: [], c: new THREE.Vector3(), k: 0 });
-      const P = by.get(r); P.faces.push(f);
-      for (let c = 0; c < 3; c++) { P.c.x += pos.getX(vi(f, c)); P.c.y += pos.getY(vi(f, c)); P.c.z += pos.getZ(vi(f, c)); P.k++; }
-    }
-    return [...by.values()].map((P) => ({ faces: P.faces, c: P.c.divideScalar(P.k), vi }));
-  }
+  const GLOVE_ZONES = ['gloveFingers', 'gloveTips', 'gloveBars', 'gloveThumb', 'gloveSide', 'gloveCuff', 'glovePalm', ...(UB.GLOVE_BLOCKS || []).map((b) => b.id)];
   function splitGloves() {
     for (const name of ['glove_left', 'glove_right']) {
-      const ps = parts.filter((p) => p.object === name);
+      // blender/export_web.py saves each block as its own object: glove_left__0, glove_left__1, ...
+      const ps = parts.filter((p) => p.object.startsWith(name + '__'));
       if (!ps.length) continue;
-      const all = ps.map((p) => ({ p, list: pieces(p.mesh.geometry) }));
-      // in the model's own axes (Blender): x across the hand, y back of hand (+) / palm (-), z fingertips (-) to cuff (+)
-      const B = (c) => ({ x: c.x, y: -c.z, z: c.y });
-      const outer = all.flatMap((a) => a.list.map((q) => B(q.c))).filter((b) => Math.abs(b.x) > 0.05);
-      const thumbSign = outer.filter((b) => b.x > 0).length >= outer.filter((b) => b.x < 0).length ? 1 : -1;
-      for (const { p, list } of all) {
-        const mat = p.mesh.material.name, faceZone = {};
-        for (const q of list) {
-          const b = B(q.c);
-          let z = 'gloves';
-          if (mat === 'Glove_Palm') z = 'glovePalm';
-          else if (mat === 'Glove_Yellow') z = 'glovesTrim';
-          else if (b.z > 0.08) z = 'gloveCuff';
-          else if (b.z < -0.03) z = 'gloveTips';
-          else if (b.z < -0.005 && Math.abs(b.x) < 0.045) z = 'gloveFingers';
-          else if (Math.abs(b.x) > 0.05) z = Math.sign(b.x) === thumbSign ? 'gloveThumb' : 'gloveSide';
-          else if (b.z > 0.03 && b.y > 0.03) z = 'gloveBars';
-          (faceZone[z] = faceZone[z] || []).push(...q.faces.flatMap((f) => [q.vi(f, 0), q.vi(f, 1), q.vi(f, 2)]));
+      // centre of each block in the glove's own axes (Blender: x across the hand, y back of hand (+) / palm (-),
+      // z fingertips (-) to cuff (+)); glTF stores those as (x, z, -y)
+      const blocks = ps.map((p) => {
+        const a = p.mesh.geometry.attributes.position, c = new THREE.Vector3();
+        for (let i = 0; i < a.count; i++) { c.x += a.getX(i); c.y += a.getY(i); c.z += a.getZ(i); }
+        c.divideScalar(a.count || 1);
+        return { p, b: { x: c.x, y: -c.z, z: c.y }, mat: p.mesh.material.name };
+      });
+      const outer = blocks.filter((k) => Math.abs(k.b.x) > 0.05);
+      const thumbSign = outer.filter((k) => k.b.x > 0).length >= outer.filter((k) => k.b.x < 0).length ? 1 : -1;
+      const T = (b) => b.x * thumbSign;                       // larger = nearer the thumb
+      const kind = (k) => {
+        const { b, mat } = k;
+        if (mat === 'Glove_Yellow') return 'glovesTrim';
+        if (mat === 'Glove_Palm') return b.z > 0.02 ? 'palm' : 'pad';
+        if (b.z > 0.08) return 'gloveCuff';
+        if (b.z < -0.03) return b.y > 0 ? 'tip' : 'under';
+        if (b.z < -0.005 && Math.abs(b.x) < 0.045) return 'roll';
+        if (Math.abs(b.x) > 0.05) return Math.sign(b.x) === thumbSign ? 'thumb' : 'side';
+        if (b.z > 0.03 && b.y > 0.03) return 'bar';
+        if (b.z < 0.02 && b.y > 0.03) return 'back';
+        return 'core';
+      };
+      blocks.forEach((k) => { k.kind = kind(k); });
+      // Fingers counted from the thumb side (index, middle, ring, pinky); panels and rolls from the thumb
+      // side; thumb and side blocks from the fingers toward the cuff.
+      const FINGERS = ['index', 'middle', 'ring', 'pinky'];
+      const number = (list, key, desc) => list.sort((a, c) => (desc ? key(c) - key(a) : key(a) - key(c))).forEach((k, i) => { k.n = i; });
+      for (const kd of ['tip', 'under', 'roll', 'pad', 'back', 'bar']) number(blocks.filter((k) => k.kind === kd), (k) => T(k.b), true);
+      for (const kd of ['thumb', 'side']) number(blocks.filter((k) => k.kind === kd), (k) => k.b.z, false);
+      const zoneOf = (k) => {
+        switch (k.kind) {
+          case 'tip': case 'under': case 'roll': case 'pad': return `gl_${FINGERS[Math.min(k.n, 3)]}_${k.kind}`;
+          case 'back': return `gl_back_${Math.min(k.n, 1) + 1}`;
+          case 'bar': return `gl_bar_${Math.min(k.n, 2) + 1}`;
+          case 'thumb': return `gl_thumb_${Math.min(k.n, 3) + 1}`;
+          case 'side': return `gl_side_${Math.min(k.n, 1) + 1}`;
+          case 'palm': return 'gl_palm';
+          case 'core': return 'gl_core';
+          default: return k.kind;
         }
-        const src = p.mesh, parent = src.parent;
-        for (const [zone, index] of Object.entries(faceZone)) {
-          const g = new THREE.BufferGeometry();
-          for (const [k, v] of Object.entries(src.geometry.attributes)) g.setAttribute(k, v);
-          g.setIndex(index);
-          const m = new THREE.Mesh(g, src.material.clone());
-          m.name = src.name + '_' + zone;
-          m.position.copy(src.position); m.quaternion.copy(src.quaternion); m.scale.copy(src.scale);
-          m.castShadow = src.castShadow; m.receiveShadow = true;
-          parent.add(m);
-          parts.push({ mesh: m, zone, object: name });
-        }
-        parent.remove(src);
-        parts.splice(parts.indexOf(p), 1);
-      }
+      };
+      blocks.forEach((k) => { k.p.zone = zoneOf(k); k.p.object = name; });
     }
   }
 
