@@ -446,6 +446,7 @@
     pantsL: { label: 'Left pants leg', where: 'Front of the leg', ...logo('pantsL') },
     pantsR: { label: 'Right pants leg', where: 'Front of the leg', ...logo('pantsR') },
     shoulder: { label: 'Shoulder patches', where: 'Top of both shoulders (3D view)', ...logo('shoulder') },
+    stick: { label: 'Stick graphic', where: 'Shaft of the stick, between the hands', ...logo('stick') },
   };
   const ICON_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>';
   function renderDrops() {

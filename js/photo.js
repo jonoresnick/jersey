@@ -43,6 +43,8 @@
       { ref: (x) => 1132 + (x - 205) * 0.15, x0: 200, x1: 370, k: 1.3, bow: 6 },
       { ref: (x) => 1117, x0: 415, x1: 570, k: 1.3, bow: 6 },
     ],
+    // the stick shaft where it shows between the hands: centre line from a to b, h = thickness
+    stick: { a: [246, 654.5], b: [628, 650.5], h: 16 },
     pants: { left: [[211, 680], [207, 905]], right: [[566, 680], [568, 906]], bottomL: 898, bottomR: 904,
       logoL: [298, 836, 56, 48, 0], logoR: [523, 815, 86, 30, -8] },
   };
@@ -383,6 +385,8 @@
       rs = boxBlur(sg, W, H * N_LAYERS, 3);
     }
 
+    const stickImg = d.photoLogos && d.photoLogos.stick ? await loadImg(d.photoLogos.stick) : null;
+    if (my !== seq) return false;
     const solid = {};
     for (const z of ['collar', 'gloves', 'glovesTrim', 'helmet']) solid[z] = UB.hexToRgb(UB.color(d, kit, z));
     canvas.width = W; canvas.height = H;
@@ -431,6 +435,7 @@
       if (k < 1) { const j = 1 - k; r = r * k + base[p] * j; g = g * k + base[p + 1] * j; b = b * k + base[p + 2] * j; }
       o[p] = r; o[p + 1] = g; o[p + 2] = b;
     }
+    if (stickImg && G().stick) printOnStick(o, W, H, stickImg, G().stick);
     // Where two parts meet (jersey and pants, sleeve and glove…), soften the join.
     if (a.seam.length) {
       const src = new Uint8ClampedArray(o);
@@ -454,6 +459,29 @@
       ctx.putImageData(out, 0, 0);
     }
     return true;
+  }
+
+  /* A graphic printed along the stick shaft: fitted to the shaft's thickness, centred between the hands,
+     and shaded like a round shaft (a bright line along the top, darker underneath). */
+  function printOnStick(o, W, H, im, S) {
+    const [ax, ay] = S.a, [bx, by] = S.b, len = Math.hypot(bx - ax, by - ay), ang = Math.atan2(by - ay, bx - ax);
+    const h = S.h * 0.8, w = Math.min(len * 0.9, (h * im.width) / Math.max(1, im.height));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.translate((ax + bx) / 2, (ay + by) / 2); x.rotate(ang);
+    x.drawImage(im, -w / 2, -h / 2, w, h);
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - 2)), x1 = Math.min(W, Math.ceil(Math.max(ax, bx) + 2));
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by) - S.h)), y1 = Math.min(H, Math.ceil(Math.max(ay, by) + S.h));
+    const g = x.getImageData(x0, y0, x1 - x0, y1 - y0).data, gw = x1 - x0;
+    for (let y = y0; y < y1; y++) for (let xx = x0; xx < x1; xx++) {
+      const q = ((y - y0) * gw + (xx - x0)) * 4, al = g[q + 3] / 255;
+      if (al <= 0) continue;
+      // where across the shaft this pixel is: 0 = top edge, 1 = bottom edge
+      const t = (xx - ax) / (bx - ax), cy = ay + (by - ay) * t, v = Math.min(1, Math.max(0, (y - (cy - S.h / 2)) / S.h));
+      const shade = 0.62 + 0.5 * Math.sin(Math.PI * v) - 0.25 * v + (v > 0.18 && v < 0.3 ? 0.18 : 0);
+      const p = (y * W + xx) * 4;
+      for (let k = 0; k < 3; k++) o[p + k] = o[p + k] * (1 - al) + Math.min(255, g[q + k] * shade) * al;
+    }
   }
 
   function zoneAt(x, y) {

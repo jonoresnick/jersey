@@ -383,13 +383,15 @@ uniform float cW; uniform float cVd; uniform float cVw; uniform vec3 cCol; unifo
     const z = normal.clone().normalize(), y = up.clone().sub(z.clone().multiplyScalar(up.dot(z))).normalize(), x = y.clone().cross(z);
     return new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
   }
-  function addDecal(key, targets, pos, normal, up, w, h, depth, zone, px, draw) {
+  function addDecal(key, targets, pos, normal, up, w, h, depth, zone, px, draw, opts = {}) {
     const canvas = document.createElement('canvas'); canvas.width = px; canvas.height = Math.round(px * h / w);
     const tex = new THREE.CanvasTexture(canvas);
     tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
     const mat = new THREE.MeshPhysicalMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4,
       roughness: 0.62, envMapIntensity: 0.55, sheen: 0.15 });
     mat.name = 'Print (' + key + ')';
+    // prints in deep shade (the stick, under the arms) light themselves a little so they stay readable
+    if (opts.glow) { mat.emissive.setHex(0xffffff); mat.emissiveMap = tex; mat.emissiveIntensity = opts.glow; }
     const rot = orient(normal, up), size = new THREE.Vector3(w, h, depth), meshes = [];
     targets.forEach((t) => {
       const g = new THREE.DecalGeometry(t, pos, rot, size);
@@ -397,7 +399,7 @@ uniform float cW; uniform float cVd; uniform float cVw; uniform vec3 cCol; unifo
       const m = new THREE.Mesh(g, mat);
       m.renderOrder = 2; m.receiveShadow = true;
       scene.add(m); meshes.push(m);
-      parts.push({ mesh: m, zone, object: key, decal: true });
+      parts.push({ mesh: m, zone, object: key, decal: true, glow: opts.glow ? 0xffffff : 0 });
     });
     decals.push({ key, canvas, ctx: canvas.getContext('2d'), tex, meshes, zone, draw });
   }
@@ -443,6 +445,23 @@ uniform float cW; uniform float cVd; uniform float cVw; uniform vec3 cCol; unifo
         if (!d.lettering.sleeveNumbers || !d.player.number) return false;
         const px = 330 * L.nf.size; P().drawText(c, d.player.number, 256, c.canvas.height / 2 + px * 0.36, px, L.nf, L.cols, Math.min(d.lettering.outlines, 1), 490); return true;
       });
+    }
+    // stick: your graphic along the shaft between the hands, on the front and the back
+    const shaft = parts.filter((p) => p.object === 'stick_shaft').map((p) => p.mesh);
+    if (shaft.length) {
+      const sb = new THREE.Box3(); shaft.forEach((m) => sb.expandByObject(m));
+      const sc = sb.getCenter(new THREE.Vector3()), th = sb.max.y - sb.min.y;
+      const drawStick = async (c, d, k, L) => {
+        if (!L.logos.stick) return false;
+        const im = await P().loadImg(L.logos.stick), H = c.canvas.height, W = c.canvas.width;
+        const w = Math.min(W, (H * 0.82 * im.width) / Math.max(1, im.height));
+        c.drawImage(im, (W - w) / 2, H * 0.09, w, H * 0.82); return true;
+      };
+      for (const [key, nrm] of [['stick_front', fwd], ['stick_back', back]]) {
+        const hs = hitOn(shaft, new THREE.Vector3(cx, sc.y, sc.z).add(nrm.clone().multiplyScalar(2)), nrm.clone().negate());
+        // shallow, so the front print doesn't also land on the back of the shaft (and the back one on the front)
+        if (hs) addDecal(key, shaft, hs.point, nrm, up, 0.42, th * 1.05, 0.014, 'stick', 1024, drawStick, { glow: 0.45 });
+      }
     }
     // back: number in the middle, name above it
     const nY = yH + span * 0.5;
@@ -696,7 +715,7 @@ uniform vec2 phB[2]; uniform vec3 phC[2]; uniform int phN; varying vec3 vStripeP
     if (zone !== hovered) {
       hovered = zone;
       const lit = (x) => zone && (x.zone === zone || (x.gdef && [x.gdef.s1, x.gdef.s2, ...(x.gdef.s1 === 'stripe1' ? ['yoke', 'yokeTrim'] : [])].includes(zone)));
-      parts.forEach((x) => x.mesh.material.emissive.setHex(lit(x) ? 0x2a2f38 : 0x000000));
+      parts.forEach((x) => x.mesh.material.emissive.setHex(lit(x) ? (x.glow || 0x2a2f38) : (x.glow || 0x000000)));
       renderer.domElement.style.cursor = zone ? 'pointer' : 'grab';
     }
     if (!tip) return;
